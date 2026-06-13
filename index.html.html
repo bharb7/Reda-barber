@@ -1,0 +1,2302 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reda Barber — Daily Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<!-- Firebase v9 compat (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<style>
+
+  /* LOGIN */
+  #loginOverlay{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0a0f1e,#0f172a);display:flex;align-items:center;justify-content:center}
+  #loginOverlay.hidden{display:none!important}
+  .login-box{background:linear-gradient(160deg,#1e293b,#162032);border:1px solid #334155;border-radius:20px;padding:44px 36px;width:100%;max-width:400px;text-align:center;font-family:'Tajawal',sans-serif;box-shadow:0 40px 80px rgba(0,0,0,0.7)}
+  .login-logo{font-size:24px;font-weight:800;background:linear-gradient(90deg,#22c55e,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:4px}
+  .login-sub{color:#64748b;font-size:13px;margin-bottom:24px}
+  .user-cards{display:flex;gap:12px;justify-content:center;margin-bottom:20px}
+  .user-card{flex:1;padding:14px 8px;border-radius:12px;border:2px solid #334155;cursor:pointer;transition:all .2s;background:#0f172a;user-select:none}
+  .user-card:hover,.user-card.selected{border-color:#22c55e;background:#0f2016}
+  .user-card.selected{box-shadow:0 0 20px rgba(34,197,94,0.15)}
+  .user-card .uavatar{font-size:28px;margin-bottom:5px}
+  .user-card .uname{font-size:14px;font-weight:700;color:#e2e8f0}
+  .user-card .urole{font-size:11px;color:#64748b;margin-top:1px}
+  #loginPw{width:100%;padding:12px 16px;background:#0f172a;border:1px solid #334155;border-radius:10px;color:#e2e8f0;font-size:15px;font-family:'Tajawal',sans-serif;text-align:center;letter-spacing:3px;margin-bottom:12px;transition:border-color .2s;box-sizing:border-box}
+  #loginPw:focus{outline:none;border-color:#22c55e}
+  .login-btn{width:100%;padding:13px;background:linear-gradient(135deg,#16a34a,#22c55e);border:none;border-radius:10px;color:#000;font-size:15px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:transform .15s}
+  .login-btn:hover{transform:translateY(-2px)}
+  .login-err{color:#ef4444;font-size:13px;margin-top:8px;min-height:18px}
+  .login-hint{color:#334155;font-size:10px;margin-top:12px}
+  /* USER BADGE */
+  #userBadge{background:#0f2016;border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:5px 11px;font-size:12px;color:#22c55e;font-weight:600;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+  #userBadge:hover{background:#162032}
+  /* LIVE SYNC DOT */
+  #liveDot{width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;margin-right:4px;transition:background .5s}
+  #liveDot.live{background:#22c55e;box-shadow:0 0 6px #22c55e}
+  #liveDot.saving{background:#fbbf24;animation:pulse .6s infinite alternate}
+  @keyframes pulse{to{opacity:0.3}}
+  #liveLabel{font-size:11px;color:var(--muted);margin-right:8px}
+  /* BILINGUAL INSIGHT */
+  .insight-panel{background:linear-gradient(135deg,#0f2016,#0f172a);border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:18px 22px;margin-bottom:18px}
+  .insight-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:600px){.insight-row{grid-template-columns:1fr}}
+  .insight-col-en{background:#0a0f1a;border-radius:10px;padding:13px 15px;border-left:3px solid #22c55e;font-size:13px;color:#94a3b8;line-height:1.7}
+  .insight-col-ar{background:#0a0f1a;border-radius:10px;padding:13px 15px;border-right:3px solid #fbbf24;font-size:14px;color:#94a3b8;line-height:1.9;direction:rtl;text-align:right;font-family:'Tajawal',sans-serif}
+  .insight-col-en strong,.insight-col-ar strong{color:#e2e8f0;display:block;margin-bottom:5px}
+  /* Arabic always Tajawal */
+  html[lang=ar] body,html[lang=ar] *{font-family:'Tajawal',sans-serif!important}
+
+  :root{
+    --bg:#0f172a; --card:#1e293b; --card2:#273449; --accent:#22c55e; --accent2:#3b82f6;
+    --warn:#f59e0b; --danger:#ef4444; --text:#e2e8f0; --muted:#94a3b8; --border:#334155;
+    --gold:#fbbf24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Tajawal,Cairo,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+  [dir=rtl] body{font-family:Tajawal,Cairo,-apple-system,sans-serif}
+  header{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:2px solid var(--accent);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:100}
+  .logo{font-size:22px;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .logo span{font-size:14px;color:var(--muted);font-weight:400;margin-left:8px}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--card2);color:var(--text);border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;transition:all .15s;font-family:inherit}
+  .btn:hover{background:var(--accent);border-color:var(--accent);color:#000}
+  .btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+  .btn.primary:hover{background:#16a34a}
+  .btn.danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+  .btn.danger:hover{background:var(--danger);color:#fff}
+  nav.tabs{display:flex;gap:4px;background:var(--card);padding:6px;border-radius:10px;overflow-x:auto;margin:16px 24px;border:1px solid var(--border)}
+  nav.tabs button{background:transparent;border:none;color:var(--muted);padding:10px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;font-family:inherit;transition:all .15s}
+  nav.tabs button.active{background:var(--accent);color:#000}
+  nav.tabs button:hover:not(.active){background:var(--card2);color:var(--text)}
+  main{padding:0 24px 40px;max-width:1400px;margin:0 auto}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;transition:all .15s}
+  .card:hover{border-color:var(--accent2)}
+  .kpi-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .kpi-value{font-size:26px;font-weight:700;color:var(--text)}
+  .kpi-sub{font-size:12px;color:var(--muted);margin-top:6px}
+  .kpi-value.up{color:var(--accent)} .kpi-value.down{color:var(--danger)} .kpi-value.warn{color:var(--warn)}
+  .section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:18px}
+  .section h2{font-size:18px;margin-bottom:14px;color:var(--text);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+  .section h2 small{font-size:13px;color:var(--muted);font-weight:400}
+  .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px}
+  .form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:500}
+  .form-group input, .form-group select, .form-group textarea{width:100%;padding:9px 11px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:14px;font-family:inherit}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent)}
+  .form-group input[type=number]::-webkit-inner-spin-button{opacity:0.4}
+  .barber-row{background:var(--card2);padding:12px;border-radius:8px;margin-bottom:10px;border:1px solid var(--border)}
+  .barber-row .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-weight:600;color:var(--accent)}
+  .barber-row .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--border)}
+  [dir=rtl] th,[dir=rtl] td{text-align:right}
+  th{background:var(--card2);color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  tr:hover td{background:var(--card2)}
+  .table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+  .pos{color:var(--accent);font-weight:600}
+  .neg{color:var(--danger);font-weight:600}
+  .neutral{color:var(--muted)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+  .badge.green{background:rgba(34,197,94,.15);color:var(--accent)}
+  .badge.red{background:rgba(239,68,68,.15);color:var(--danger)}
+  .badge.yellow{background:rgba(245,158,11,.15);color:var(--warn)}
+  .badge.blue{background:rgba(59,130,246,.15);color:var(--accent2)}
+  .chart-wrap{position:relative;height:300px;margin-top:10px}
+  .chart-wrap.small{height:220px}
+  .advice-card{background:linear-gradient(135deg,var(--card2),var(--card));border-left:4px solid var(--accent);padding:14px 18px;border-radius:8px;margin-bottom:12px;position:relative}
+  [dir=rtl] .advice-card{border-left:none;border-right:4px solid var(--accent)}
+  .advice-card.warn{border-color:var(--warn)}
+  .advice-card.bad{border-color:var(--danger)}
+  .advice-card.info{border-color:var(--accent2)}
+  .advice-card h3{font-size:14px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .advice-card p{color:var(--text);font-size:13px;line-height:1.55}
+  .icon{display:inline-block;width:22px;height:22px;font-size:18px;text-align:center}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:768px){.row{grid-template-columns:1fr}main{padding:0 14px 30px}header{padding:12px 14px}nav.tabs{margin:14px}.kpi-value{font-size:22px}}
+  .hidden{display:none!important}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:var(--card2);border:1px solid var(--border);border-radius:14px;font-size:12px;color:var(--muted)}
+  .tip-list{list-style:none}
+  .tip-list li{padding:10px 14px;background:var(--card2);border-radius:8px;margin-bottom:8px;border-left:3px solid var(--accent2);font-size:13px}
+  [dir=rtl] .tip-list li{border-left:none;border-right:3px solid var(--accent2)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .week-selector{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .week-selector button{flex:1;min-width:90px;padding:8px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);cursor:pointer;font-size:12px}
+  .week-selector button.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#000;padding:12px 20px;border-radius:8px;font-weight:600;box-shadow:0 10px 25px rgba(0,0,0,.4);z-index:1000;animation:slideIn .3s}
+  @keyframes slideIn{from{transform:translateX(120%)}to{transform:translateX(0)}}
+  .small-text{font-size:11px;color:var(--muted)}
+  details{background:var(--card2);border-radius:8px;padding:12px;margin-top:10px;border:1px solid var(--border)}
+  summary{cursor:pointer;font-weight:600;color:var(--text);font-size:14px}
+  details[open] summary{margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">✂️ الصالون الملكي</div>
+    <div class="login-sub">Reda Barber — Live Partner Dashboard</div>
+    <div class="user-cards">
+      <div class="user-card" id="cardBilal" onclick="selectUser('bilal')">
+        <div class="uavatar">👤</div><div class="uname">Bilal</div><div class="urole">بلال</div>
+      </div>
+      <div class="user-card" id="cardReda" onclick="selectUser('reda')">
+        <div class="uavatar">✂️</div><div class="uname">Reda</div><div class="urole">رضا</div>
+      </div>
+    </div>
+    <input type="password" id="loginPw" placeholder="🔑 Password / كلمة المرور" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">دخول — Login</button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-hint">bilal → bilal2026 &nbsp;|&nbsp; reda → reda2026</div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">Reda Barber <span id="subtitle">Daily Operations Dashboard</span></div>
+  <div class="toolbar">
+    <span id="liveDot"></span><span id="liveLabel">connecting...</span><div id="userBadge" onclick="doLogout()" title="Logout">👤 <span id="userBadgeLabel">—</span> 🚪</div>
+    <button class="btn" id="langBtn">العربية</button>
+    <button class="btn" id="exportBtn">💾 <span data-i18n="export">Export</span></button>
+    <button class="btn" id="importBtn">📂 <span data-i18n="import">Import</span></button>
+    <input type="file" id="importFile" accept=".json" style="display:none">
+  </div>
+</header>
+
+<nav class="tabs" id="tabsNav">
+  <button data-tab="dashboard" class="active" data-i18n="tab_dash">📊 Dashboard</button>
+  <button data-tab="entry" data-i18n="tab_entry">📝 Daily Entry</button>
+  <button data-tab="weekly" data-i18n="tab_weekly">📅 Weekly Reports</button>
+  <button data-tab="monthly" data-i18n="tab_monthly">📈 Monthly View</button>
+  <button data-tab="expenses" data-i18n="tab_expenses">💸 Monthly Expenses</button>
+  <button data-tab="withdrawals" data-i18n="tab_withdrawals">💰 Withdrawals</button>
+  <button data-tab="setup" data-i18n="tab_setup">🏗️ Setup Costs</button>
+  <button data-tab="vat" data-i18n="tab_vat">📑 VAT / Bills</button>
+  <button data-tab="advisor" data-i18n="tab_advisor">🤖 AI Advisor</button>
+  <button data-tab="marketing" data-i18n="tab_marketing">📢 Marketing</button>
+  <button data-tab="settings" data-i18n="tab_settings">⚙️ Settings</button>
+</nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="tab-dashboard">
+
+    <div class="insight-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <span style="font-size:14px;font-weight:700;color:var(--accent)">📊 Snapshot — نظرة سريعة</span>
+        <button class="btn" onclick="refreshInsight()" style="padding:4px 11px;font-size:11px">🔄</button>
+      </div>
+      <div class="insight-row">
+        <div class="insight-col-en" id="insightEN"><strong>Tap 🔄 to analyze</strong></div>
+        <div class="insight-col-ar" id="insightAR"><strong>اضغط 🔄 للتحليل</strong></div>
+      </div>
+    </div>
+    <div class="grid" id="kpiGrid"></div>
+    <div class="row">
+      <div class="section">
+        <h2><span data-i18n="income_30">Last 30 days income</span></h2>
+        <div class="chart-wrap"><canvas id="chartIncome30"></canvas></div>
+      </div>
+      <div class="section">
+        <h2><span data-i18n="profit_30">Last 30 days profit</span></h2>
+        <div class="chart-wrap"><canvas id="chartProfit30"></canvas></div>
+      </div>
+    </div>
+    <div class="section">
+      <h2><span data-i18n="recent">Recent days</span></h2>
+      <div class="table-wrap"><table id="recentTable"></table></div>
+    </div>
+    <div class="section">
+      <h2>🤖 <span data-i18n="ai_quick">AI Quick Insight</span></h2>
+      <div id="quickAdvice"></div>
+    </div>
+  </section>
+
+  <!-- DAILY ENTRY -->
+  <section id="tab-entry" class="hidden">
+    <div class="section">
+      <h2><span data-i18n="entry_title">Log Today's Data</span> <small id="entryDateLabel"></small></h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="date">Date</label>
+          <input type="date" id="entryDate">
+        </div>
+      </div>
+      <div id="barberInputs"></div>
+      <h3 style="margin-top:18px;margin-bottom:10px;color:var(--muted);font-size:14px" data-i18n="expenses_title">EXPENSES</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="reda_daily">Reda daily expense (SAR)</label>
+          <input type="number" id="entryRedaDaily" value="30" min="0" step="0.5">
+        </div>
+        <div class="form-group">
+          <label data-i18n="shop_expense">Shop expense (SAR)</label>
+          <input type="number" id="entryShopExpense" value="0" min="0" step="0.5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-i18n="expense_details">Expense details / notes</label>
+        <textarea id="entryDetails" rows="2" placeholder="e.g. cleaning supplies, soda bottles..."></textarea>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn primary" id="saveEntryBtn">💾 <span data-i18n="save_entry">Save / Update entry</span></button>
+        <button class="btn danger" id="deleteEntryBtn">🗑 <span data-i18n="delete_entry">Delete this date</span></button>
+        <button class="btn" id="loadEntryBtn">↻ <span data-i18n="load_entry">Load date</span></button>
+      </div>
+      <div class="card" style="margin-top:18px;background:var(--card2)">
+        <div class="kpi-label" data-i18n="entry_preview">Live preview</div>
+        <div id="entryPreview" style="font-size:14px;line-height:1.8"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WEEKLY -->
+  <section id="tab-weekly" class="hidden">
+    <div class="section">
+      <h2><span data-i18n="weekly_title">Weekly Reports</span></h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="select_month">Month</label>
+          <select id="weeklyMonth"></select>
+        </div>
+      </div>
+      <div class="week-selector" id="weekTabs"></div>
+      <div class="grid" id="weeklyKpis"></div>
+      <div class="row" style="margin-top:14px">
+        <div class="section" style="margin:0">
+          <h2 style="font-size:15px"><span data-i18n="week_breakdown">Daily breakdown</span></h2>
+          <div class="table-wrap"><table id="weeklyTable"></table></div>
+        </div>
+        <div class="section" style="margin:0">
+          <h2 style="font-size:15px"><span data-i18n="week_chart">Income vs Profit (week)</span></h2>
+          <div class="chart-wrap small"><canvas id="chartWeek"></canvas></div>
+          <h3 style="margin-top:14px;font-size:13px;color:var(--muted)" data-i18n="ai_for_week">AI advice for this week</h3>
+          <div id="weeklyAdvice"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MONTHLY -->
+  <section id="tab-monthly" class="hidden">
+    <div class="section">
+      <h2><span data-i18n="monthly_title">Monthly Comparison</span></h2>
+      <div class="grid" id="monthlyKpis"></div>
+      <div class="row" style="margin-top:14px">
+        <div class="section" style="margin:0">
+          <h2 style="font-size:15px"><span data-i18n="month_income">Income by month</span></h2>
+          <div class="chart-wrap small"><canvas id="chartMonthIncome"></canvas></div>
+        </div>
+        <div class="section" style="margin:0">
+          <h2 style="font-size:15px"><span data-i18n="month_profit">Profit & expenses by month</span></h2>
+          <div class="chart-wrap small"><canvas id="chartMonthProfit"></canvas></div>
+        </div>
+      </div>
+      <div class="section" style="margin-top:14px">
+        <h2 style="font-size:15px"><span data-i18n="month_table">Monthly summary</span></h2>
+        <div class="table-wrap"><table id="monthlyTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MONTHLY EXPENSES (variable + fixed commitments) -->
+  <section id="tab-expenses" class="hidden">
+    <div class="section">
+      <h2><span data-i18n="me_title">Monthly Expenses & Commitments</span> <small data-i18n="me_sub">— editable per month</small></h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="select_month">Month</label>
+          <select id="expensesMonth"></select>
+        </div>
+      </div>
+      <div class="grid" id="expensesKpis" style="margin-bottom:16px"></div>
+
+      <h3 style="margin:18px 0 10px;color:var(--accent);font-size:15px" data-i18n="me_fixed">Fixed monthly deductions (auto-applied)</h3>
+      <div class="table-wrap"><table id="fixedExpensesTable"></table></div>
+
+      <h3 style="margin:24px 0 10px;color:var(--gold);font-size:15px" data-i18n="me_variable">Variable expenses for this month</h3>
+      <div class="table-wrap"><table id="variableExpensesTable"></table></div>
+
+      <details open style="margin-top:14px">
+        <summary data-i18n="me_add">+ Add a new expense for this month</summary>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label data-i18n="me_cat">Category</label>
+            <select id="expenseCategory">
+              <option value="electricity">⚡ Electricity (الكهرباء)</option>
+              <option value="water">💧 Water (الماء)</option>
+              <option value="internet">📶 Internet (الإنترنت)</option>
+              <option value="violation">🚨 Violation / Fine (مخالفة)</option>
+              <option value="rent_lump">🏠 Rent payment (10,000 SAR / 3 months)</option>
+              <option value="supplies">🧴 Supplies (مستلزمات)</option>
+              <option value="maintenance">🔧 Maintenance (صيانة)</option>
+              <option value="marketing">📢 Marketing (تسويق)</option>
+              <option value="other">📝 Other (أخرى)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="me_amount">Amount (SAR)</label>
+            <input type="number" id="expenseAmount" value="0" min="0" step="0.5">
+          </div>
+          <div class="form-group">
+            <label data-i18n="me_descr">Description</label>
+            <input type="text" id="expenseDescription" placeholder="e.g. Saudi Electricity Company bill">
+          </div>
+          <div class="form-group">
+            <label data-i18n="me_date">Date</label>
+            <input type="date" id="expenseDate">
+          </div>
+        </div>
+        <button class="btn primary" id="addExpenseBtn">+ <span data-i18n="add">Add</span></button>
+      </details>
+    </div>
+  </section>
+
+  <!-- WITHDRAWALS -->
+  <section id="tab-withdrawals" class="hidden">
+    <div class="section">
+      <h2><span data-i18n="wd_title">Partner Withdrawals</span> <small data-i18n="wd_sub">— deducted from each partner's monthly share</small></h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="select_month">Month</label>
+          <select id="withdrawalsMonth"></select>
+        </div>
+      </div>
+      <div class="grid" id="withdrawalsKpis" style="margin-bottom:16px"></div>
+      <div class="table-wrap"><table id="withdrawalsTable"></table></div>
+
+      <details open style="margin-top:14px">
+        <summary data-i18n="wd_add">+ Record a new withdrawal</summary>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label data-i18n="wd_who">Partner</label>
+            <select id="wdPerson"></select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="wd_amount">Amount (SAR)</label>
+            <input type="number" id="wdAmount" value="0" min="0" step="0.5">
+          </div>
+          <div class="form-group">
+            <label data-i18n="wd_date">Date</label>
+            <input type="date" id="wdDate">
+          </div>
+          <div class="form-group">
+            <label data-i18n="wd_note">Note (optional)</label>
+            <input type="text" id="wdNote" placeholder="e.g. personal expense">
+          </div>
+        </div>
+        <button class="btn primary" id="addWdBtn">+ <span data-i18n="add">Add</span></button>
+      </details>
+    </div>
+  </section>
+
+  <!-- SETUP COSTS -->
+  <section id="tab-setup" class="hidden">
+    <div class="section">
+      <h2><span data-i18n="setup_title">Initial Investment (Pre-opening)</span></h2>
+      <div class="grid" id="setupKpis"></div>
+      <div class="table-wrap" style="margin-top:14px"><table id="setupTable"></table></div>
+      <details>
+        <summary data-i18n="setup_add">Add a setup expense entry</summary>
+        <div class="form-row" style="margin-top:10px">
+          <div class="form-group">
+            <label data-i18n="date">Date</label>
+            <input type="date" id="setupDate">
+          </div>
+          <div class="form-group">
+            <label data-i18n="capital">Capital (SAR)</label>
+            <input type="number" id="setupCapital" value="0" step="0.5">
+          </div>
+          <div class="form-group">
+            <label data-i18n="expense">Expense (SAR)</label>
+            <input type="number" id="setupExpense" value="0" step="0.5">
+          </div>
+          <div class="form-group">
+            <label data-i18n="description">Description</label>
+            <input type="text" id="setupDesc">
+          </div>
+        </div>
+        <button class="btn primary" id="addSetupBtn" data-i18n="add">+ Add</button>
+      </details>
+    </div>
+  </section>
+
+  <!-- VAT / BILLS -->
+  <section id="tab-vat" class="hidden">
+    <div class="section">
+      <h2><span data-i18n="vat_title">VAT Tracking & Supplier Bills</span> <small data-i18n="vat_sub">— Saudi Arabia VAT is 15% (since July 2020)</small></h2>
+      <div class="grid" id="vatKpis" style="margin-bottom:16px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="select_month">Month</label>
+          <select id="vatMonth"></select>
+        </div>
+      </div>
+      <div class="table-wrap"><table id="vatTable"></table></div>
+
+      <details open style="margin-top:14px">
+        <summary data-i18n="vat_add">+ Add a supplier bill</summary>
+        <p class="small-text" data-i18n="vat_help">Enter the gross amount (incl. VAT). The system will split it into net + 15% VAT automatically. Useful for reclaiming input VAT if you are VAT-registered.</p>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label data-i18n="vat_date">Date</label>
+            <input type="date" id="billDate">
+          </div>
+          <div class="form-group">
+            <label data-i18n="vat_supplier">Supplier</label>
+            <input type="text" id="billSupplier" placeholder="e.g. SEC, STC, Lulu">
+          </div>
+          <div class="form-group">
+            <label data-i18n="vat_cat">Category</label>
+            <select id="billCategory">
+              <option value="utilities">Utilities</option>
+              <option value="supplies">Supplies</option>
+              <option value="rent">Rent</option>
+              <option value="equipment">Equipment</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="vat_gross">Gross amount incl. VAT (SAR)</label>
+            <input type="number" id="billGross" value="0" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label data-i18n="vat_invoice">Invoice # (optional)</label>
+            <input type="text" id="billInvoice">
+          </div>
+        </div>
+        <button class="btn primary" id="addBillBtn">+ <span data-i18n="add">Add bill</span></button>
+      </details>
+    </div>
+  </section>
+
+  <!-- AI ADVISOR -->
+  <section id="tab-advisor" class="hidden">
+    <div class="section">
+      <h2>🤖 <span data-i18n="ai_full">AI Business Advisor</span> <small data-i18n="ai_sub">— based on your last 30/60/90 days of data</small></h2>
+      <div id="fullAdvice"></div>
+    </div>
+    <div class="section">
+      <h2>⚡ <span data-i18n="productivity">Productivity Tips for a Barbershop Owner</span></h2>
+      <ul class="tip-list" id="productivityList"></ul>
+    </div>
+  </section>
+
+  <!-- MARKETING -->
+  <section id="tab-marketing" class="hidden">
+    <div class="section">
+      <h2>📢 <span data-i18n="marketing_title">Practical Marketing Ideas</span></h2>
+      <div id="marketingGrid" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="tab-settings" class="hidden">
+    <div class="section">
+      <h2>⚙️ <span data-i18n="barbers_title">Manage Barbers & Commission</span></h2>
+      <div id="barbersList"></div>
+      <div class="form-row" style="margin-top:14px">
+        <div class="form-group">
+          <label data-i18n="new_barber">New barber name</label>
+          <input type="text" id="newBarberName" placeholder="e.g. Ahmed">
+        </div>
+        <div class="form-group">
+          <label data-i18n="commission">Commission %</label>
+          <input type="number" id="newBarberCommission" value="50" min="0" max="100">
+        </div>
+        <div class="form-group">
+          <label data-i18n="owner_q">Is this you (the owner)?</label>
+          <select id="newBarberOwner">
+            <option value="false" data-i18n="no">No</option>
+            <option value="true" data-i18n="yes">Yes</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn primary" id="addBarberBtn">+ <span data-i18n="add_barber">Add barber</span></button>
+    </div>
+    <div class="section">
+      <h2>👥 <span data-i18n="partners_t">Profit-sharing Partners</span></h2>
+      <div id="partnersList"></div>
+    </div>
+    <div class="section">
+      <h2>📅 <span data-i18n="monthly_commit">Monthly Commitments</span></h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="saudi_part_label">Saudi partner allowance / month (SAR)</label>
+          <input type="number" id="saudiPartnerMonthly" value="1000" min="0" step="50">
+        </div>
+        <div class="form-group">
+          <label data-i18n="rent_amt_label">Rent total amount (SAR)</label>
+          <input type="number" id="rentAmount" value="10000" min="0" step="100">
+        </div>
+        <div class="form-group">
+          <label data-i18n="rent_months_label">Rent cycle (months)</label>
+          <input type="number" id="rentMonths" value="3" min="1" max="12" step="1">
+        </div>
+        <div class="form-group">
+          <label data-i18n="rent_mode">Rent deduction mode</label>
+          <select id="rentMode">
+            <option value="amortize" data-i18n="amortize">Amortize (3,333/month)</option>
+            <option value="lump" data-i18n="lump">Lump (deduct full 10k in payment month)</option>
+          </select>
+        </div>
+      </div>
+      <small class="small-text" data-i18n="rent_help">Saudi rent: 10,000 SAR every 3 months. Choose 'amortize' to deduct 3,333/month evenly, or 'lump' to deduct only in the month you actually pay.</small>
+    </div>
+    <div class="section">
+      <h2>💳 <span data-i18n="card_fee">Card Processing Fee</span></h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="card_pct">Fee % on card payments (Mada/Visa)</label>
+          <input type="number" id="cardFeePct" value="0.8" min="0" max="20" step="0.05">
+        </div>
+        <div class="form-group">
+          <label data-i18n="vat_rate_label">VAT rate %</label>
+          <input type="number" id="vatRate" value="15" min="0" max="30" step="0.5">
+        </div>
+      </div>
+      <small class="small-text" data-i18n="card_help">Saudi Arabia: Mada ~0.5-0.8%, Visa/Mastercard ~1.5-2.75%. Default 0.8% is a reasonable blended estimate. Saudi VAT is 15%.</small>
+    </div>
+    <div class="section">
+      <h2>🗄 <span data-i18n="data_mgmt">Data Management</span></h2>
+      <p class="small-text" data-i18n="data_help">Your data is stored in your browser's local storage. Export regularly to back up.</p>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" id="exportBtn2">💾 <span data-i18n="export_data">Export JSON</span></button>
+        <button class="btn" id="importBtn2">📂 <span data-i18n="import_data">Import JSON</span></button>
+        <button class="btn danger" id="resetBtn">🗑 <span data-i18n="reset_all">Reset all data</span></button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+// =================== I18N ===================
+const I18N = {
+  en: {
+    tab_dash:"📊 Dashboard", tab_entry:"📝 Daily Entry", tab_weekly:"📅 Weekly Reports",
+    tab_monthly:"📈 Monthly View", tab_setup:"🏗️ Setup Costs", tab_advisor:"🤖 AI Advisor",
+    tab_marketing:"📢 Marketing", tab_settings:"⚙️ Settings",
+    tab_expenses:"💸 Monthly Expenses", tab_withdrawals:"💰 Withdrawals", tab_vat:"📑 VAT / Bills",
+    me_title:"Monthly Expenses & Commitments", me_sub:"— editable per month",
+    me_fixed:"Fixed monthly deductions (auto-applied)", me_variable:"Variable expenses for this month",
+    me_add:"+ Add a new expense for this month", me_cat:"Category", me_amount:"Amount (SAR)",
+    me_descr:"Description", me_date:"Date",
+    wd_title:"Partner Withdrawals", wd_sub:"— deducted from each partner's monthly share",
+    wd_add:"+ Record a new withdrawal", wd_who:"Partner", wd_amount:"Amount (SAR)",
+    wd_date:"Date", wd_note:"Note (optional)",
+    vat_title:"VAT Tracking & Supplier Bills", vat_sub:"— Saudi Arabia VAT is 15% (since July 2020)",
+    vat_add:"+ Add a supplier bill", vat_help:"Enter the gross amount (incl. VAT). The system will split it into net + 15% VAT automatically.",
+    vat_date:"Date", vat_supplier:"Supplier", vat_cat:"Category", vat_gross:"Gross amount incl. VAT (SAR)",
+    vat_invoice:"Invoice # (optional)",
+    nx_net:"Net (excl. VAT)", nx_vat:"VAT (15%)", nx_total:"Total (gross)",
+    saudi_partner:"Saudi partner (monthly)", rent_alloc:"Rent allocation",
+    card_fees:"Card processing fees", true_net:"REAL Net Profit (after everything)",
+    bilal_share:"Bilal share (50%)", reda_share:"Reda share (50%)",
+    bilal_takehome:"Bilal take-home (after withdrawals)", reda_takehome:"Reda take-home (after withdrawals)",
+    rent_help:"Saudi rent: 10,000 SAR every 3 months. Choose 'amortize' to deduct 3,333/month evenly, or 'lump' to deduct only in the month you actually pay.",
+    rent_mode:"Rent deduction mode", amortize:"Amortize (3,333/month)", lump:"Lump (deduct full 10k in payment month)",
+    monthly_commit:"Monthly Commitments", saudi_part_label:"Saudi partner allowance / month (SAR)",
+    rent_amt_label:"Rent total amount (SAR)", rent_months_label:"Rent cycle (months)",
+    vat_rate_label:"VAT rate %", action:"Action",
+    operational:"Operational profit (income − commissions − daily exp − card fees)",
+    full_chain:"Full deduction chain",
+    partner_a:"Partner A name", partner_b:"Partner B name", partner_share:"Share %",
+    paid_in:"PAID this month", commit_only:"Commitment only (not paid yet)",
+    export:"Export", import:"Import",
+    income_30:"Last 30 days income", profit_30:"Last 30 days profit",
+    recent:"Recent days", ai_quick:"AI Quick Insight",
+    entry_title:"Log Today's Data", date:"Date",
+    expenses_title:"EXPENSES", reda_daily:"Reda daily expense (SAR)", shop_expense:"Shop expense (SAR)",
+    expense_details:"Expense details / notes", save_entry:"Save / Update entry",
+    delete_entry:"Delete this date", load_entry:"Load date",
+    entry_preview:"Live preview",
+    weekly_title:"Weekly Reports", select_month:"Month",
+    week_breakdown:"Daily breakdown", week_chart:"Income vs Profit (week)", ai_for_week:"AI advice for this week",
+    monthly_title:"Monthly Comparison", month_income:"Income by month", month_profit:"Profit & expenses by month",
+    month_table:"Monthly summary",
+    setup_title:"Initial Investment (Pre-opening)", setup_add:"Add a setup expense entry",
+    capital:"Capital (SAR)", expense:"Expense (SAR)", description:"Description", add:"+ Add",
+    ai_full:"AI Business Advisor", ai_sub:"— based on your last 30/60/90 days of data",
+    productivity:"Productivity Tips for a Barbershop Owner",
+    marketing_title:"Practical Marketing Ideas",
+    barbers_title:"Manage Barbers & Commission", new_barber:"New barber name",
+    commission:"Commission %", owner_q:"Is this you (the owner)?", no:"No", yes:"Yes",
+    add_barber:"Add barber", card_fee:"Card Processing Fee", card_pct:"Fee % on card payments (Mada/Visa)",
+    card_help:"Used to estimate net profit after card-network fees.",
+    data_mgmt:"Data Management", data_help:"Your data is stored in your browser's local storage. Export regularly to back up.",
+    export_data:"Export JSON", import_data:"Import JSON", reset_all:"Reset all data",
+    cash:"Cash", card:"Card", income:"Income", expense_word:"Expense", profit:"Profit",
+    avg:"Average", max:"Max", min:"Min", days:"days",
+    today:"Today", yesterday:"Yesterday",
+    sub:"Daily Operations Dashboard",
+    confirm_reset:"This will erase ALL data and reload defaults. Continue?",
+    confirm_delete:"Delete the entry for this date?",
+    saved:"✓ Saved",
+    nodata:"No entries yet for this period."
+  },
+  ar: {
+    tab_dash:"📊 الرئيسية", tab_entry:"📝 إدخال يومي", tab_weekly:"📅 تقارير أسبوعية",
+    tab_monthly:"📈 عرض شهري", tab_setup:"🏗️ تكاليف التأسيس", tab_advisor:"🤖 المستشار",
+    tab_marketing:"📢 التسويق", tab_settings:"⚙️ الإعدادات",
+    tab_expenses:"💸 المصاريف الشهرية", tab_withdrawals:"💰 السحوبات", tab_vat:"📑 الضريبة / الفواتير",
+    me_title:"المصاريف والالتزامات الشهرية", me_sub:"— قابلة للتعديل لكل شهر",
+    me_fixed:"الخصومات الشهرية الثابتة (تطبق تلقائيًا)", me_variable:"المصاريف المتغيرة لهذا الشهر",
+    me_add:"+ إضافة مصروف جديد لهذا الشهر", me_cat:"الفئة", me_amount:"المبلغ (ر.س)",
+    me_descr:"الوصف", me_date:"التاريخ",
+    wd_title:"سحوبات الشركاء", wd_sub:"— تُخصم من حصة الشريك الشهرية",
+    wd_add:"+ تسجيل سحب جديد", wd_who:"الشريك", wd_amount:"المبلغ (ر.س)",
+    wd_date:"التاريخ", wd_note:"ملاحظة (اختياري)",
+    vat_title:"متابعة ضريبة القيمة المضافة والفواتير", vat_sub:"— ضريبة السعودية ١٥٪ (منذ يوليو ٢٠٢٠)",
+    vat_add:"+ إضافة فاتورة مورد", vat_help:"أدخل المبلغ شامل الضريبة. سيتم احتساب صافي + ١٥٪ ضريبة تلقائيًا.",
+    vat_date:"التاريخ", vat_supplier:"المورد", vat_cat:"الفئة", vat_gross:"المبلغ شامل الضريبة (ر.س)",
+    vat_invoice:"رقم الفاتورة (اختياري)",
+    nx_net:"الصافي (قبل الضريبة)", nx_vat:"الضريبة (١٥٪)", nx_total:"الإجمالي (شامل)",
+    saudi_partner:"الشريك السعودي (شهري)", rent_alloc:"حصة الإيجار",
+    card_fees:"رسوم الشبكة", true_net:"صافي الربح الفعلي (بعد كل الخصومات)",
+    bilal_share:"حصة بلال (٥٠٪)", reda_share:"حصة رضا (٥٠٪)",
+    bilal_takehome:"صافي ما يستلمه بلال (بعد السحوبات)", reda_takehome:"صافي ما يستلمه رضا (بعد السحوبات)",
+    rent_help:"إيجار سعودي: ١٠٠٠٠ ر.س كل ٣ أشهر. اختر 'تقسيم' لخصم ٣٣٣٣/شهر بالتساوي، أو 'دفعة كاملة' للخصم فقط في شهر الدفع.",
+    rent_mode:"طريقة خصم الإيجار", amortize:"تقسيم (٣٣٣٣/شهر)", lump:"دفعة كاملة (١٠٠٠٠ في شهر الدفع)",
+    monthly_commit:"الالتزامات الشهرية", saudi_part_label:"بدل الشريك السعودي / شهر (ر.س)",
+    rent_amt_label:"مبلغ الإيجار الكلي (ر.س)", rent_months_label:"دورة الإيجار (أشهر)",
+    vat_rate_label:"معدل الضريبة %", action:"إجراء",
+    operational:"الربح التشغيلي (الدخل − العمولات − المصاريف اليومية − رسوم الشبكة)",
+    full_chain:"سلسلة الخصومات الكاملة",
+    partner_a:"اسم الشريك أ", partner_b:"اسم الشريك ب", partner_share:"النسبة %",
+    paid_in:"دُفع هذا الشهر", commit_only:"التزام فقط (لم يُدفع بعد)",
+    export:"تصدير", import:"استيراد",
+    income_30:"دخل آخر ٣٠ يوم", profit_30:"أرباح آخر ٣٠ يوم",
+    recent:"آخر الأيام", ai_quick:"نظرة سريعة بالذكاء الاصطناعي",
+    entry_title:"تسجيل بيانات اليوم", date:"التاريخ",
+    expenses_title:"المصروفات", reda_daily:"مصروف رضا اليومي (ر.س)", shop_expense:"مصاريف المحل (ر.س)",
+    expense_details:"تفاصيل المصاريف", save_entry:"حفظ / تحديث",
+    delete_entry:"حذف بيانات هذا اليوم", load_entry:"تحميل تاريخ",
+    entry_preview:"معاينة مباشرة",
+    weekly_title:"التقارير الأسبوعية", select_month:"الشهر",
+    week_breakdown:"تفصيل يومي", week_chart:"الدخل مقابل الربح (الأسبوع)", ai_for_week:"نصيحة الذكاء الاصطناعي للأسبوع",
+    monthly_title:"المقارنة الشهرية", month_income:"الدخل حسب الشهر", month_profit:"الأرباح والمصاريف",
+    month_table:"الملخص الشهري",
+    setup_title:"الاستثمار الأولي (قبل الافتتاح)", setup_add:"إضافة مصروف تأسيس",
+    capital:"رأس مال (ر.س)", expense:"مصروف (ر.س)", description:"الوصف", add:"+ إضافة",
+    ai_full:"المستشار التجاري بالذكاء الاصطناعي", ai_sub:"— استناداً إلى آخر ٣٠/٦٠/٩٠ يوم",
+    productivity:"نصائح لزيادة إنتاجية صاحب المحل",
+    marketing_title:"أفكار تسويقية عملية",
+    barbers_title:"إدارة الحلاقين والنسب", new_barber:"اسم الحلاق",
+    commission:"نسبة %", owner_q:"هل هذا المالك؟", no:"لا", yes:"نعم",
+    add_barber:"إضافة حلاق", card_fee:"رسوم الشبكة", card_pct:"رسوم % على دفع الشبكة (مدى/فيزا)",
+    card_help:"تستخدم لحساب صافي الربح بعد رسوم الشبكة.",
+    data_mgmt:"إدارة البيانات", data_help:"بياناتك محفوظة في المتصفح. صدّر نسخة احتياطية بانتظام.",
+    export_data:"تصدير JSON", import_data:"استيراد JSON", reset_all:"حذف جميع البيانات",
+    cash:"كاش", card:"شبكة", income:"الدخل", expense_word:"المصروف", profit:"الربح",
+    avg:"المتوسط", max:"الأعلى", min:"الأدنى", days:"أيام",
+    today:"اليوم", yesterday:"أمس",
+    sub:"لوحة العمليات اليومية",
+    confirm_reset:"سيتم حذف كل البيانات وإعادة تحميل الافتراضي. متابعة؟",
+    confirm_delete:"حذف بيانات هذا اليوم؟",
+    saved:"✓ تم الحفظ",
+    nodata:"لا توجد بيانات لهذه الفترة."
+  }
+};
+let LANG = localStorage.getItem('lang') || 'en';
+const t = (k) => I18N[LANG][k] || k;
+
+// =================== HISTORICAL DATA (pre-loaded from Excel) ===================
+const HISTORICAL = {"setup":[{"date":"2026-01-17","capital":2000.0,"expense":2000.0,"description":"Bilal capital/visa Jaz"},{"date":"2026-01-17","capital":2000.0,"expense":2000.0,"description":"Rent 1"},{"date":"2026-01-19","capital":8000.0,"expense":8000.0,"description":"Rent 2"},{"date":"2026-01-20","capital":1000.0,"expense":200.0,"description":""},{"date":null,"capital":4000.0,"expense":100.0,"description":""},{"date":null,"capital":1300.0,"expense":6000.0,"description":"Contractor"},{"date":"2026-01-21","capital":1000.0,"expense":450.0,"description":"100 design + 350 sofa leather"},{"date":null,"capital":0,"expense":500.0,"description":"Alsa3ee alhabashi"},{"date":"2026-01-23","capital":4000.0,"expense":0,"description":""},{"date":"2026-01-25","capital":4000.0,"expense":0,"description":""},{"date":null,"capital":0,"expense":1000.0,"description":"Contract fees for renting"},{"date":null,"capital":0,"expense":500.0,"description":"2nd payment contractor"},{"date":null,"capital":0,"expense":3500.0,"description":"Bill for equipments and chairs"},{"date":null,"capital":0,"expense":1000.0,"description":"Ac"},{"date":null,"capital":0,"expense":450.0,"description":"Mirror"},{"date":null,"capital":0,"expense":1000.0,"description":"AC"},{"date":"2026-01-27","capital":3000.0,"expense":0,"description":""},{"date":"2026-01-28","capital":3200.0,"expense":0,"description":""},{"date":"2026-01-30","capital":150.0,"expense":0,"description":"Fire @cleaning"},{"date":null,"capital":0,"expense":500.0,"description":"Badeel rokhaaam"},{"date":null,"capital":1366.0,"expense":1366.0,"description":"Baladiya + Safety @cleaning"},{"date":"2026-01-30","capital":0,"expense":1000.0,"description":"Board sign"},{"date":null,"capital":0,"expense":800.0,"description":"Drawer closet cabins"},{"date":null,"capital":0,"expense":4000.0,"description":"3rd payment contractor"},{"date":"2026-02-02","capital":4000.0,"expense":550.0,"description":"Mirrors"},{"date":null,"capital":0,"expense":1000.0,"description":"4th payment contractor"},{"date":"2026-02-03","capital":0,"expense":1000.0,"description":""},{"date":"2026-02-03","capital":0,"expense":500.0,"description":"Sign board"},{"date":"2026-02-04","capital":0,"expense":200.0,"description":"50 dabab & business card"},{"date":null,"capital":0,"expense":500.0,"description":"Last payment sign board"},{"date":null,"capital":3000.0,"expense":3000.0,"description":"Payment to fatoura"},{"date":"2026-02-04","capital":500.0,"expense":500.0,"description":"Baladeya"},{"date":"2026-02-05","capital":1936.0,"expense":1936.0,"description":"Baladeyah license"},{"date":"2026-02-05","capital":1500.0,"expense":1500.0,"description":"Last payment fatoura"},{"date":null,"capital":0,"expense":100.0,"description":"Garbage"},{"date":null,"capital":3000.0,"expense":1000.0,"description":"Cameras"},{"date":null,"capital":0,"expense":2000.0,"description":"Contractor remain 500"}],"daily":[{"date":"2026-02-07","reda_cash":55.0,"reda_card":30.0,"ibrahim_cash":120.0,"ibrahim_card":50.0,"fawaz_cash":0,"fawaz_card":0,"total_income":255.0,"ibrahim_pct":85.0,"fawaz_pct":0,"net_income":170.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-08","reda_cash":230.0,"reda_card":0,"ibrahim_cash":100.0,"ibrahim_card":50.0,"fawaz_cash":0,"fawaz_card":0,"total_income":380.0,"ibrahim_pct":75.0,"fawaz_pct":0,"net_income":305.0,"reda_daily_expense":30.0,"shop_expense":130.0,"expense_details":"قهوة يوم الافتتاح ولمبات ٧٠ و١٠ عامل نظافة","total_expense":160.0,"profit":0},{"date":"2026-02-09","reda_cash":15.0,"reda_card":40.0,"ibrahim_cash":50.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":105.0,"ibrahim_pct":25.0,"fawaz_pct":0,"net_income":80.0,"reda_daily_expense":20.0,"shop_expense":350.0,"expense_details":"باقي ستاير محل","total_expense":370.0,"profit":0},{"date":"2026-02-10","reda_cash":125.0,"reda_card":0,"ibrahim_cash":50.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":175.0,"ibrahim_pct":25.0,"fawaz_pct":0,"net_income":150.0,"reda_daily_expense":30.0,"shop_expense":150.0,"expense_details":"من حق كاميرات","total_expense":180.0,"profit":0},{"date":"2026-02-11","reda_cash":130.0,"reda_card":35.0,"ibrahim_cash":25.0,"ibrahim_card":55.0,"fawaz_cash":0,"fawaz_card":0,"total_income":245.0,"ibrahim_pct":40.0,"fawaz_pct":0,"net_income":205.0,"reda_daily_expense":30.0,"shop_expense":170.0,"expense_details":"من حق كاميرات","total_expense":200.0,"profit":0},{"date":"2026-02-12","reda_cash":260.0,"reda_card":30.0,"ibrahim_cash":155.0,"ibrahim_card":80.0,"fawaz_cash":0,"fawaz_card":0,"total_income":525.0,"ibrahim_pct":117.5,"fawaz_pct":0,"net_income":407.5,"reda_daily_expense":30.0,"shop_expense":377.0,"expense_details":"من حق كاميرات","total_expense":407.0,"profit":0},{"date":"2026-02-13","reda_cash":70.0,"reda_card":55.0,"ibrahim_cash":60.0,"ibrahim_card":45.0,"fawaz_cash":0,"fawaz_card":0,"total_income":230.0,"ibrahim_pct":52.5,"fawaz_pct":0,"net_income":177.5,"reda_daily_expense":30.0,"shop_expense":100.0,"expense_details":"آخر دفعة كاميرات","total_expense":130.0,"profit":0},{"date":"2026-02-14","reda_cash":30.0,"reda_card":15.0,"ibrahim_cash":20.0,"ibrahim_card":0.0,"fawaz_cash":0,"fawaz_card":0,"total_income":65.0,"ibrahim_pct":10.0,"fawaz_pct":0,"net_income":55.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-15","reda_cash":40.0,"reda_card":15.0,"ibrahim_cash":0,"ibrahim_card":15.0,"fawaz_cash":0,"fawaz_card":0,"total_income":70.0,"ibrahim_pct":7.5,"fawaz_pct":0,"net_income":62.5,"reda_daily_expense":30.0,"shop_expense":65.0,"expense_details":"ناموسه ضد الناموس ولحشرات","total_expense":95.0,"profit":0},{"date":"2026-02-16","reda_cash":125.0,"reda_card":5.0,"ibrahim_cash":30.0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":190.0,"ibrahim_pct":30.0,"fawaz_pct":0,"net_income":160.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-17","reda_cash":40.0,"reda_card":40.0,"ibrahim_cash":55.0,"ibrahim_card":40.0,"fawaz_cash":0,"fawaz_card":0,"total_income":175.0,"ibrahim_pct":47.5,"fawaz_pct":0,"net_income":127.5,"reda_daily_expense":30.0,"shop_expense":200.0,"expense_details":"سطول زبالة +باقي دفعة ستاير","total_expense":230.0,"profit":0},{"date":"2026-02-18","reda_cash":75.0,"reda_card":30.0,"ibrahim_cash":0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":105.0,"ibrahim_pct":0.0,"fawaz_pct":0,"net_income":105.0,"reda_daily_expense":30.0,"shop_expense":113.0,"expense_details":"تاسيس خدمه جهاز نقط البيع /\n بداية رمضان","total_expense":143.0,"profit":0},{"date":"2026-02-19","reda_cash":50.0,"reda_card":60.0,"ibrahim_cash":0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":140.0,"ibrahim_pct":15.0,"fawaz_pct":0,"net_income":125.0,"reda_daily_expense":30.0,"shop_expense":500.0,"expense_details":"حق الشبكه مكينه","total_expense":530.0,"profit":0},{"date":"2026-02-20","reda_cash":195.0,"reda_card":70.0,"ibrahim_cash":40.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":305.0,"ibrahim_pct":20.0,"fawaz_pct":0,"net_income":285.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-21","reda_cash":70.0,"reda_card":90.0,"ibrahim_cash":45.0,"ibrahim_card":35.0,"fawaz_cash":0,"fawaz_card":0,"total_income":240.0,"ibrahim_pct":40.0,"fawaz_pct":0,"net_income":200.0,"reda_daily_expense":30.0,"shop_expense":150.0,"expense_details":"مريله2 لاواصق صبغه سلفر2 امشاط مكينه","total_expense":180.0,"profit":0},{"date":"2026-02-22","reda_cash":50.0,"reda_card":15.0,"ibrahim_cash":25.0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":120.0,"ibrahim_pct":27.5,"fawaz_pct":0,"net_income":92.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-23","reda_cash":50.0,"reda_card":0,"ibrahim_cash":0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":80.0,"ibrahim_pct":15.0,"fawaz_pct":0,"net_income":65.0,"reda_daily_expense":30.0,"shop_expense":0.0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-24","reda_cash":60.0,"reda_card":0,"ibrahim_cash":0,"ibrahim_card":40.0,"fawaz_cash":0,"fawaz_card":0,"total_income":100.0,"ibrahim_pct":20.0,"fawaz_pct":0,"net_income":80.0,"reda_daily_expense":30.0,"shop_expense":0.0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-25","reda_cash":60.0,"reda_card":60.0,"ibrahim_cash":0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":120.0,"ibrahim_pct":0.0,"fawaz_pct":0,"net_income":120.0,"reda_daily_expense":30.0,"shop_expense":0.0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-26","reda_cash":70.0,"reda_card":60.0,"ibrahim_cash":0,"ibrahim_card":60.0,"fawaz_cash":0,"fawaz_card":0,"total_income":190.0,"ibrahim_pct":30.0,"fawaz_pct":0,"net_income":160.0,"reda_daily_expense":30.0,"shop_expense":0.0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-27","reda_cash":130.0,"reda_card":15.0,"ibrahim_cash":60.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":205.0,"ibrahim_pct":30.0,"fawaz_pct":0,"net_income":175.0,"reda_daily_expense":30.0,"shop_expense":0.0,"expense_details":"","total_expense":30.0,"profit":0},{"date":"2026-02-28","reda_cash":40.0,"reda_card":110.0,"ibrahim_cash":70.0,"ibrahim_card":45.0,"fawaz_cash":0,"fawaz_card":0,"total_income":265.0,"ibrahim_pct":57.5,"fawaz_pct":0,"net_income":207.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"كفيل حق الشهريه المحل","total_expense":30.0,"profit":0},{"date":"2026-03-01","reda_cash":60.0,"reda_card":80.0,"ibrahim_cash":10.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":150.0,"ibrahim_pct":5.0,"fawaz_pct":0,"net_income":145.0,"reda_daily_expense":30.0,"shop_expense":55.0,"expense_details":"بطايق شبكه محل","total_expense":85.0,"profit":60.0},{"date":"2026-03-02","reda_cash":55.0,"reda_card":85.0,"ibrahim_cash":70.0,"ibrahim_card":70.0,"fawaz_cash":0,"fawaz_card":0,"total_income":280.0,"ibrahim_pct":70.0,"fawaz_pct":0,"net_income":210.0,"reda_daily_expense":30.0,"shop_expense":215.0,"expense_details":"اغراض محل","total_expense":245.0,"profit":-35.0},{"date":"2026-03-03","reda_cash":30.0,"reda_card":35.0,"ibrahim_cash":85.0,"ibrahim_card":20.0,"fawaz_cash":0,"fawaz_card":0,"total_income":170.0,"ibrahim_pct":52.5,"fawaz_pct":0,"net_income":117.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":87.5},{"date":"2026-03-04","reda_cash":50.0,"reda_card":20.0,"ibrahim_cash":55.0,"ibrahim_card":45.0,"fawaz_cash":0,"fawaz_card":0,"total_income":170.0,"ibrahim_pct":50.0,"fawaz_pct":0,"net_income":120.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":90.0},{"date":"2026-03-05","reda_cash":30.0,"reda_card":90.0,"ibrahim_cash":95.0,"ibrahim_card":60.0,"fawaz_cash":0,"fawaz_card":0,"total_income":275.0,"ibrahim_pct":77.5,"fawaz_pct":0,"net_income":197.5,"reda_daily_expense":30.0,"shop_expense":149.0,"expense_details":"سفر عدد ٤٠٠/و مناشف باردة ٣ صناديق = ٣٦ حبة","total_expense":179.0,"profit":18.5},{"date":"2026-03-06","reda_cash":130.0,"reda_card":75.0,"ibrahim_cash":60.0,"ibrahim_card":85.0,"fawaz_cash":0,"fawaz_card":0,"total_income":350.0,"ibrahim_pct":72.5,"fawaz_pct":0,"net_income":277.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":247.5},{"date":"2026-03-07","reda_cash":50.0,"reda_card":35.0,"ibrahim_cash":20.0,"ibrahim_card":40.0,"fawaz_cash":0,"fawaz_card":0,"total_income":145.0,"ibrahim_pct":30.0,"fawaz_pct":0,"net_income":115.0,"reda_daily_expense":30.0,"shop_expense":125.0,"expense_details":"معا اكرم باقي المقاول 500 /شبكه 125","total_expense":155.0,"profit":-40.0},{"date":"2026-03-08","reda_cash":45.0,"reda_card":60.0,"ibrahim_cash":55.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":160.0,"ibrahim_pct":27.5,"fawaz_pct":0,"net_income":132.5,"reda_daily_expense":30.0,"shop_expense":145.0,"expense_details":"دولاب رفوف","total_expense":175.0,"profit":-42.5},{"date":"2026-03-09","reda_cash":45.0,"reda_card":40.0,"ibrahim_cash":30.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":115.0,"ibrahim_pct":15.0,"fawaz_pct":0,"net_income":100.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":70.0},{"date":"2026-03-10","reda_cash":155.0,"reda_card":20.0,"ibrahim_cash":115.0,"ibrahim_card":50.0,"fawaz_cash":0,"fawaz_card":0,"total_income":340.0,"ibrahim_pct":82.5,"fawaz_pct":0,"net_income":257.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":227.5},{"date":"2026-03-11","reda_cash":170.0,"reda_card":0,"ibrahim_cash":105.0,"ibrahim_card":20.0,"fawaz_cash":0,"fawaz_card":0,"total_income":295.0,"ibrahim_pct":62.5,"fawaz_pct":0,"net_income":232.5,"reda_daily_expense":30.0,"shop_expense":50.0,"expense_details":"غسيل باب معا وزن40 وورق ماكينة شبكة ١٠","total_expense":80.0,"profit":152.5},{"date":"2026-03-12","reda_cash":145.0,"reda_card":80.0,"ibrahim_cash":190.0,"ibrahim_card":125.0,"fawaz_cash":0,"fawaz_card":0,"total_income":540.0,"ibrahim_pct":157.5,"fawaz_pct":0,"net_income":382.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":352.5},{"date":"2026-03-13","reda_cash":105.0,"reda_card":0,"ibrahim_cash":20.0,"ibrahim_card":50.0,"fawaz_cash":0,"fawaz_card":0,"total_income":175.0,"ibrahim_pct":35.0,"fawaz_pct":0,"net_income":140.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":110.0},{"date":"2026-03-14","reda_cash":150.0,"reda_card":105.0,"ibrahim_cash":235.0,"ibrahim_card":45.0,"fawaz_cash":0,"fawaz_card":0,"total_income":535.0,"ibrahim_pct":140.0,"fawaz_pct":0,"net_income":395.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":365.0},{"date":"2026-03-15","reda_cash":210.0,"reda_card":255.0,"ibrahim_cash":305.0,"ibrahim_card":105.0,"fawaz_cash":0,"fawaz_card":0,"total_income":875.0,"ibrahim_pct":205.0,"fawaz_pct":0,"net_income":670.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"من حق التزام بلال الشهري","total_expense":30.0,"profit":640.0},{"date":"2026-03-16","reda_cash":200.0,"reda_card":65.0,"ibrahim_cash":265.0,"ibrahim_card":65.0,"fawaz_cash":0,"fawaz_card":0,"total_income":595.0,"ibrahim_pct":165.0,"fawaz_pct":0,"net_income":430.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":400.0},{"date":"2026-03-17","reda_cash":605.0,"reda_card":270.0,"ibrahim_cash":575.0,"ibrahim_card":190.0,"fawaz_cash":0,"fawaz_card":0,"total_income":1640.0,"ibrahim_pct":382.5,"fawaz_pct":0,"net_income":1257.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":1227.5},{"date":"2026-03-18","reda_cash":1160.0,"reda_card":330.0,"ibrahim_cash":805.0,"ibrahim_card":310.0,"fawaz_cash":0,"fawaz_card":0,"total_income":2605.0,"ibrahim_pct":557.5,"fawaz_pct":0,"net_income":2047.5,"reda_daily_expense":30.0,"shop_expense":450.0,"expense_details":"اغراض محل","total_expense":480.0,"profit":1567.5},{"date":"2026-03-19","reda_cash":1050.0,"reda_card":190.0,"ibrahim_cash":735.0,"ibrahim_card":400.0,"fawaz_cash":0,"fawaz_card":0,"total_income":2375.0,"ibrahim_pct":567.5,"fawaz_pct":0,"net_income":1807.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"افطار من قبل بلال حسابه","total_expense":30.0,"profit":1777.5},{"date":"2026-03-20","reda_cash":0,"reda_card":0,"ibrahim_cash":0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":0.0,"ibrahim_pct":0.0,"fawaz_pct":0,"net_income":0.0,"reda_daily_expense":30.0,"shop_expense":235.0,"expense_details":"عيد الفطر +سفر حلاقه35 //معايدة للابراهيم 200","total_expense":265.0,"profit":-265.0},{"date":"2026-03-21","reda_cash":255.0,"reda_card":65.0,"ibrahim_cash":0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":320.0,"ibrahim_pct":0.0,"fawaz_pct":0,"net_income":320.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"عيد الفطر","total_expense":30.0,"profit":290.0},{"date":"2026-03-22","reda_cash":70.0,"reda_card":25.0,"ibrahim_cash":0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":95.0,"ibrahim_pct":0.0,"fawaz_pct":0,"net_income":95.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":65.0},{"date":"2026-03-23","reda_cash":30.0,"reda_card":60.0,"ibrahim_cash":30.0,"ibrahim_card":70.0,"fawaz_cash":0,"fawaz_card":0,"total_income":190.0,"ibrahim_pct":50.0,"fawaz_pct":0,"net_income":140.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":110.0},{"date":"2026-03-24","reda_cash":80.0,"reda_card":30.0,"ibrahim_cash":80.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":190.0,"ibrahim_pct":40.0,"fawaz_pct":0,"net_income":150.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":120.0},{"date":"2026-03-25","reda_cash":60.0,"reda_card":45.0,"ibrahim_cash":60.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":165.0,"ibrahim_pct":30.0,"fawaz_pct":0,"net_income":135.0,"reda_daily_expense":30.0,"shop_expense":215.0,"expense_details":"بخاخ صبغه شعر +مساكت كرلي +2راس استشوار","total_expense":245.0,"profit":-110.0},{"date":"2026-03-26","reda_cash":160.0,"reda_card":125.0,"ibrahim_cash":85.0,"ibrahim_card":55.0,"fawaz_cash":0,"fawaz_card":0,"total_income":425.0,"ibrahim_pct":70.0,"fawaz_pct":0,"net_income":355.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":325.0},{"date":"2026-03-27","reda_cash":110.0,"reda_card":40.0,"ibrahim_cash":110.0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":290.0,"ibrahim_pct":70.0,"fawaz_pct":0,"net_income":220.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":190.0},{"date":"2026-03-28","reda_cash":70.0,"reda_card":45.0,"ibrahim_cash":40.0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":185.0,"ibrahim_pct":35.0,"fawaz_pct":0,"net_income":150.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":120.0},{"date":"2026-03-29","reda_cash":260.0,"reda_card":0,"ibrahim_cash":70.0,"ibrahim_card":80.0,"fawaz_cash":0,"fawaz_card":0,"total_income":410.0,"ibrahim_pct":75.0,"fawaz_pct":0,"net_income":335.0,"reda_daily_expense":30.0,"shop_expense":50.0,"expense_details":"غسيل باب معا صبغه شعر معا لفاف رقبه","total_expense":80.0,"profit":255.0},{"date":"2026-03-30","reda_cash":135.0,"reda_card":20.0,"ibrahim_cash":60.0,"ibrahim_card":55.0,"fawaz_cash":0,"fawaz_card":0,"total_income":270.0,"ibrahim_pct":57.5,"fawaz_pct":0,"net_income":212.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":182.5},{"date":"2026-03-31","reda_cash":40.0,"reda_card":50.0,"ibrahim_cash":40.0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":160.0,"ibrahim_pct":35.0,"fawaz_pct":0,"net_income":125.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":95.0},{"date":"2026-04-01","reda_cash":170.0,"reda_card":50.0,"ibrahim_cash":105.0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":355.0,"ibrahim_pct":67.5,"fawaz_pct":0,"net_income":287.5,"reda_daily_expense":30.0,"shop_expense":168.0,"expense_details":"مناشف شعر  مكينه تنعيم  مناديل","total_expense":198.0,"profit":89.5},{"date":"2026-04-02","reda_cash":210.0,"reda_card":145.0,"ibrahim_cash":150.0,"ibrahim_card":85.0,"fawaz_cash":0,"fawaz_card":0,"total_income":590.0,"ibrahim_pct":117.5,"fawaz_pct":0,"net_income":472.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":442.5},{"date":"2026-04-03","reda_cash":155.0,"reda_card":95.0,"ibrahim_cash":80.0,"ibrahim_card":20.0,"fawaz_cash":0,"fawaz_card":0,"total_income":350.0,"ibrahim_pct":50.0,"fawaz_pct":0,"net_income":300.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":270.0},{"date":"2026-04-04","reda_cash":100.0,"reda_card":135.0,"ibrahim_cash":155.0,"ibrahim_card":90.0,"fawaz_cash":0,"fawaz_card":0,"total_income":480.0,"ibrahim_pct":122.5,"fawaz_pct":0,"net_income":357.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":357.5},{"date":"2026-04-05","reda_cash":235.0,"reda_card":50.0,"ibrahim_cash":60.0,"ibrahim_card":60.0,"fawaz_cash":0,"fawaz_card":0,"total_income":405.0,"ibrahim_pct":60.0,"fawaz_pct":0,"net_income":345.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":315.0},{"date":"2026-04-06","reda_cash":150.0,"reda_card":70.0,"ibrahim_cash":90.0,"ibrahim_card":50.0,"fawaz_cash":0,"fawaz_card":0,"total_income":360.0,"ibrahim_pct":70.0,"fawaz_pct":0,"net_income":290.0,"reda_daily_expense":30.0,"shop_expense":80.0,"expense_details":"لوح خشب معا اسطوانه صاروخ","total_expense":110.0,"profit":180.0},{"date":"2026-04-07","reda_cash":225.0,"reda_card":10.0,"ibrahim_cash":160.0,"ibrahim_card":110.0,"fawaz_cash":0,"fawaz_card":0,"total_income":505.0,"ibrahim_pct":135.0,"fawaz_pct":0,"net_income":370.0,"reda_daily_expense":30.0,"shop_expense":594.0,"expense_details":"8الوح سمنت بورد معا الحديد معا حق التوصيل معا حق العامل","total_expense":624.0,"profit":-254.0},{"date":"2026-04-08","reda_cash":75.0,"reda_card":30.0,"ibrahim_cash":220.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":325.0,"ibrahim_pct":110.0,"fawaz_pct":0,"net_income":215.0,"reda_daily_expense":30.0,"shop_expense":160.0,"expense_details":"بويه معا معجون","total_expense":190.0,"profit":25.0},{"date":"2026-04-09","reda_cash":260.0,"reda_card":60.0,"ibrahim_cash":185.0,"ibrahim_card":20.0,"fawaz_cash":0,"fawaz_card":0,"total_income":525.0,"ibrahim_pct":102.5,"fawaz_pct":0,"net_income":422.5,"reda_daily_expense":30.0,"shop_expense":350.0,"expense_details":"مكينه صرافه-للسعودي التأني","total_expense":380.0,"profit":42.5},{"date":"2026-04-10","reda_cash":115.0,"reda_card":50.0,"ibrahim_cash":135.0,"ibrahim_card":80.0,"fawaz_cash":0,"fawaz_card":0,"total_income":380.0,"ibrahim_pct":107.5,"fawaz_pct":0,"net_income":272.5,"reda_daily_expense":80.0,"shop_expense":0,"expense_details":"تاسيس الجاهاز الشبكه 194+@150","total_expense":80.0,"profit":192.5},{"date":"2026-04-11","reda_cash":100.0,"reda_card":60.0,"ibrahim_cash":120.0,"ibrahim_card":35.0,"fawaz_cash":0,"fawaz_card":0,"total_income":315.0,"ibrahim_pct":77.5,"fawaz_pct":0,"net_income":237.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":207.5},{"date":"2026-04-12","reda_cash":135.0,"reda_card":80.0,"ibrahim_cash":230.0,"ibrahim_card":105.0,"fawaz_cash":0,"fawaz_card":0,"total_income":550.0,"ibrahim_pct":167.5,"fawaz_pct":0,"net_income":382.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":352.5},{"date":"2026-04-13","reda_cash":170.0,"reda_card":85.0,"ibrahim_cash":0,"ibrahim_card":20.0,"fawaz_cash":0,"fawaz_card":0,"total_income":275.0,"ibrahim_pct":10.0,"fawaz_pct":0,"net_income":265.0,"reda_daily_expense":30.0,"shop_expense":15.0,"expense_details":"مغلقه باب","total_expense":45.0,"profit":220.0},{"date":"2026-04-14","reda_cash":50.0,"reda_card":65.0,"ibrahim_cash":130.0,"ibrahim_card":55.0,"fawaz_cash":0,"fawaz_card":0,"total_income":300.0,"ibrahim_pct":92.5,"fawaz_pct":0,"net_income":207.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":177.5},{"date":"2026-04-15","reda_cash":75.0,"reda_card":150.0,"ibrahim_cash":125.0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":380.0,"ibrahim_pct":77.5,"fawaz_pct":0,"net_income":302.5,"reda_daily_expense":30.0,"shop_expense":10.0,"expense_details":"غسيل باب","total_expense":40.0,"profit":262.5},{"date":"2026-04-16","reda_cash":95.0,"reda_card":30.0,"ibrahim_cash":200.0,"ibrahim_card":40.0,"fawaz_cash":0,"fawaz_card":0,"total_income":365.0,"ibrahim_pct":120.0,"fawaz_pct":0,"net_income":245.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":215.0},{"date":"2026-04-17","reda_cash":205.0,"reda_card":165.0,"ibrahim_cash":160.0,"ibrahim_card":120.0,"fawaz_cash":0,"fawaz_card":0,"total_income":650.0,"ibrahim_pct":140.0,"fawaz_pct":0,"net_income":510.0,"reda_daily_expense":30.0,"shop_expense":200.0,"expense_details":"نت كيمرات المحل","total_expense":230.0,"profit":280.0},{"date":"2026-04-18","reda_cash":80.0,"reda_card":150.0,"ibrahim_cash":150.0,"ibrahim_card":150.0,"fawaz_cash":0,"fawaz_card":0,"total_income":530.0,"ibrahim_pct":150.0,"fawaz_pct":0,"net_income":380.0,"reda_daily_expense":30.0,"shop_expense":130.0,"expense_details":"اغراض محل","total_expense":160.0,"profit":220.0},{"date":"2026-04-19","reda_cash":240.0,"reda_card":15.0,"ibrahim_cash":120.0,"ibrahim_card":90.0,"fawaz_cash":0,"fawaz_card":0,"total_income":465.0,"ibrahim_pct":105.0,"fawaz_pct":0,"net_income":360.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":330.0},{"date":"2026-04-20","reda_cash":130.0,"reda_card":55.0,"ibrahim_cash":70.0,"ibrahim_card":145.0,"fawaz_cash":0,"fawaz_card":0,"total_income":400.0,"ibrahim_pct":107.5,"fawaz_pct":0,"net_income":292.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":262.5},{"date":"2026-04-21","reda_cash":175.0,"reda_card":20.0,"ibrahim_cash":90.0,"ibrahim_card":100.0,"fawaz_cash":0,"fawaz_card":0,"total_income":385.0,"ibrahim_pct":95.0,"fawaz_pct":0,"net_income":290.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":260.0},{"date":"2026-04-22","reda_cash":70.0,"reda_card":20.0,"ibrahim_cash":155.0,"ibrahim_card":15.0,"fawaz_cash":0,"fawaz_card":0,"total_income":260.0,"ibrahim_pct":85.0,"fawaz_pct":0,"net_income":175.0,"reda_daily_expense":30.0,"shop_expense":340.0,"expense_details":"مواد جبسمبورد تصليح الغرفه فوق السكن","total_expense":370.0,"profit":-195.0},{"date":"2026-04-23","reda_cash":195.0,"reda_card":50.0,"ibrahim_cash":120.0,"ibrahim_card":40.0,"fawaz_cash":0,"fawaz_card":0,"total_income":405.0,"ibrahim_pct":80.0,"fawaz_pct":0,"net_income":325.0,"reda_daily_expense":30.0,"shop_expense":17.0,"expense_details":"كرتون مويه","total_expense":47.0,"profit":278.0},{"date":"2026-04-24","reda_cash":165.0,"reda_card":80.0,"ibrahim_cash":170.0,"ibrahim_card":65.0,"fawaz_cash":0,"fawaz_card":0,"total_income":480.0,"ibrahim_pct":117.5,"fawaz_pct":0,"net_income":362.5,"reda_daily_expense":30.0,"shop_expense":40.0,"expense_details":"رسوم حوالات )7 حوالات واحدة منهم إلى الجزيرة (بلال)","total_expense":70.0,"profit":292.5},{"date":"2026-04-25","reda_cash":130.0,"reda_card":20.0,"ibrahim_cash":105.0,"ibrahim_card":60.0,"fawaz_cash":0,"fawaz_card":0,"total_income":315.0,"ibrahim_pct":82.5,"fawaz_pct":0,"net_income":232.5,"reda_daily_expense":30.0,"shop_expense":120.0,"expense_details":"تصليح المكيف","total_expense":150.0,"profit":82.5},{"date":"2026-04-26","reda_cash":125.0,"reda_card":60.0,"ibrahim_cash":100.0,"ibrahim_card":0,"fawaz_cash":0,"fawaz_card":0,"total_income":285.0,"ibrahim_pct":50.0,"fawaz_pct":0,"net_income":235.0,"reda_daily_expense":30.0,"shop_expense":60.0,"expense_details":"صبغه شعر +لصقه انف مشط غسيل باب","total_expense":90.0,"profit":145.0},{"date":"2026-04-27","reda_cash":255.0,"reda_card":35.0,"ibrahim_cash":355.0,"ibrahim_card":80.0,"fawaz_cash":0,"fawaz_card":0,"total_income":725.0,"ibrahim_pct":217.5,"fawaz_pct":0,"net_income":507.5,"reda_daily_expense":30.0,"shop_expense":41.0,"expense_details":"تحويل من فيزا ifresh","total_expense":71.0,"profit":436.5},{"date":"2026-04-28","reda_cash":155.0,"reda_card":65.0,"ibrahim_cash":150.0,"ibrahim_card":70.0,"fawaz_cash":0,"fawaz_card":0,"total_income":440.0,"ibrahim_pct":110.0,"fawaz_pct":0,"net_income":330.0,"reda_daily_expense":30.0,"shop_expense":46.0,"expense_details":"اكياس زباله","total_expense":76.0,"profit":254.0},{"date":"2026-04-29","reda_cash":90.0,"reda_card":65.0,"ibrahim_cash":115.0,"ibrahim_card":30.0,"fawaz_cash":0,"fawaz_card":0,"total_income":300.0,"ibrahim_pct":72.5,"fawaz_pct":0,"net_income":227.5,"reda_daily_expense":30.0,"shop_expense":68.0,"expense_details":"حوالات ٩٠٠، ١٠٠٠ و...... على هلا","total_expense":98.0,"profit":129.5},{"date":"2026-04-30","reda_cash":125.0,"reda_card":110.0,"ibrahim_cash":125.0,"ibrahim_card":115.0,"fawaz_cash":0,"fawaz_card":0,"total_income":475.0,"ibrahim_pct":120.0,"fawaz_pct":0,"net_income":355.0,"reda_daily_expense":30.0,"shop_expense":615.0,"expense_details":"سحوبات الشبكة الشهري و مسحوبات مباشرة بعد الزبائن و التأسيس","total_expense":645.0,"profit":-290.0},{"date":"2026-05-01","reda_cash":40.0,"reda_card":90.0,"ibrahim_cash":110.0,"ibrahim_card":85.0,"fawaz_cash":0,"fawaz_card":0,"total_income":325.0,"ibrahim_pct":97.5,"fawaz_pct":0.0,"net_income":227.5,"reda_daily_expense":30.0,"shop_expense":257.0,"expense_details":"مصاريف إمدادات الكهرباء","total_expense":287.0,"profit":-59.5},{"date":"2026-05-02","reda_cash":15.0,"reda_card":140.0,"ibrahim_cash":120.0,"ibrahim_card":85.0,"fawaz_cash":0,"fawaz_card":0,"total_income":360.0,"ibrahim_pct":102.5,"fawaz_pct":0.0,"net_income":257.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":227.5},{"date":"2026-05-03","reda_cash":45.0,"reda_card":60.0,"ibrahim_cash":155.0,"ibrahim_card":55.0,"fawaz_cash":30.0,"fawaz_card":0,"total_income":345.0,"ibrahim_pct":105.0,"fawaz_pct":15.0,"net_income":225.0,"reda_daily_expense":30.0,"shop_expense":142.0,"expense_details":"كهرباء ودوش وفيش ورأس فيش ومفتاح مكيف","total_expense":172.0,"profit":53.0},{"date":"2026-05-04","reda_cash":125.0,"reda_card":115.0,"ibrahim_cash":90.0,"ibrahim_card":125.0,"fawaz_cash":85.0,"fawaz_card":100.0,"total_income":640.0,"ibrahim_pct":107.5,"fawaz_pct":92.5,"net_income":440.0,"reda_daily_expense":30.0,"shop_expense":145.0,"expense_details":"مناديل معا مناشف شعر ومناشف وجه","total_expense":175.0,"profit":265.0},{"date":"2026-05-05","reda_cash":170.0,"reda_card":10.0,"ibrahim_cash":110.0,"ibrahim_card":0,"fawaz_cash":65.0,"fawaz_card":40.0,"total_income":395.0,"ibrahim_pct":55.0,"fawaz_pct":52.5,"net_income":287.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":257.5},{"date":"2026-05-06","reda_cash":80.0,"reda_card":100.0,"ibrahim_cash":105.0,"ibrahim_card":65.0,"fawaz_cash":80.0,"fawaz_card":0,"total_income":430.0,"ibrahim_pct":85.0,"fawaz_pct":40.0,"net_income":305.0,"reda_daily_expense":30.0,"shop_expense":10.0,"expense_details":"غسيل باب","total_expense":40.0,"profit":265.0},{"date":"2026-05-07","reda_cash":55.0,"reda_card":55.0,"ibrahim_cash":60.0,"ibrahim_card":30.0,"fawaz_cash":50.0,"fawaz_card":0,"total_income":250.0,"ibrahim_pct":45.0,"fawaz_pct":25.0,"net_income":180.0,"reda_daily_expense":30.0,"shop_expense":75.0,"expense_details":"كرتون سفر +مقص+مشط استشوار+امواس","total_expense":105.0,"profit":75.0},{"date":"2026-05-08","reda_cash":160.0,"reda_card":170.0,"ibrahim_cash":65.0,"ibrahim_card":30.0,"fawaz_cash":130.0,"fawaz_card":20.0,"total_income":575.0,"ibrahim_pct":47.5,"fawaz_pct":75.0,"net_income":452.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":422.5},{"date":"2026-05-09","reda_cash":65.0,"reda_card":25.0,"ibrahim_cash":95.0,"ibrahim_card":60.0,"fawaz_cash":30.0,"fawaz_card":35.0,"total_income":310.0,"ibrahim_pct":77.5,"fawaz_pct":32.5,"net_income":200.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":170.0},{"date":"2026-05-10","reda_cash":185.0,"reda_card":20.0,"ibrahim_cash":105.0,"ibrahim_card":35.0,"fawaz_cash":0,"fawaz_card":0,"total_income":345.0,"ibrahim_pct":70.0,"fawaz_pct":0.0,"net_income":275.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"فواز غادر","total_expense":30.0,"profit":245.0},{"date":"2026-05-11","reda_cash":260.0,"reda_card":105.0,"ibrahim_cash":105.0,"ibrahim_card":140.0,"fawaz_cash":0,"fawaz_card":0,"total_income":610.0,"ibrahim_pct":122.5,"fawaz_pct":0.0,"net_income":487.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":457.5},{"date":"2026-05-12","reda_cash":125.0,"reda_card":100.0,"ibrahim_cash":95.0,"ibrahim_card":70.0,"fawaz_cash":0,"fawaz_card":0,"total_income":390.0,"ibrahim_pct":82.5,"fawaz_pct":0.0,"net_income":307.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":277.5},{"date":"2026-05-13","reda_cash":80.0,"reda_card":35.0,"ibrahim_cash":75.0,"ibrahim_card":120.0,"fawaz_cash":0,"fawaz_card":0,"total_income":310.0,"ibrahim_pct":97.5,"fawaz_pct":0.0,"net_income":212.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":182.5},{"date":"2026-05-14","reda_cash":150.0,"reda_card":50.0,"ibrahim_cash":215.0,"ibrahim_card":95.0,"fawaz_cash":0,"fawaz_card":0,"total_income":510.0,"ibrahim_pct":155.0,"fawaz_pct":0.0,"net_income":355.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":325.0},{"date":"2026-05-15","reda_cash":60.0,"reda_card":105.0,"ibrahim_cash":35.0,"ibrahim_card":90.0,"fawaz_cash":0,"fawaz_card":0,"total_income":290.0,"ibrahim_pct":62.5,"fawaz_pct":0.0,"net_income":227.5,"reda_daily_expense":30.0,"shop_expense":10.0,"expense_details":"غسيل باب","total_expense":40.0,"profit":187.5},{"date":"2026-05-16","reda_cash":100.0,"reda_card":125.0,"ibrahim_cash":175.0,"ibrahim_card":60.0,"fawaz_cash":0,"fawaz_card":0,"total_income":460.0,"ibrahim_pct":117.5,"fawaz_pct":0.0,"net_income":342.5,"reda_daily_expense":30.0,"shop_expense":60.0,"expense_details":"عامل نظافه","total_expense":90.0,"profit":252.5},{"date":"2026-05-17","reda_cash":155.0,"reda_card":30.0,"ibrahim_cash":170.0,"ibrahim_card":50.0,"fawaz_cash":30.0,"fawaz_card":105.0,"total_income":540.0,"ibrahim_pct":110.0,"fawaz_pct":67.5,"net_income":362.5,"reda_daily_expense":30.0,"shop_expense":95.0,"expense_details":"مناديل +منفخ هواء","total_expense":125.0,"profit":237.5},{"date":"2026-05-18","reda_cash":155.0,"reda_card":60.0,"ibrahim_cash":140.0,"ibrahim_card":15.0,"fawaz_cash":0,"fawaz_card":0,"total_income":370.0,"ibrahim_pct":77.5,"fawaz_pct":0.0,"net_income":292.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":262.5},{"date":"2026-05-19","reda_cash":120.0,"reda_card":80.0,"ibrahim_cash":120.0,"ibrahim_card":100.0,"fawaz_cash":0,"fawaz_card":0,"total_income":420.0,"ibrahim_pct":110.0,"fawaz_pct":0.0,"net_income":310.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":280.0},{"date":"2026-05-20","reda_cash":140.0,"reda_card":170.0,"ibrahim_cash":140.0,"ibrahim_card":75.0,"fawaz_cash":0,"fawaz_card":0,"total_income":525.0,"ibrahim_pct":107.5,"fawaz_pct":0.0,"net_income":417.5,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":387.5},{"date":"2026-05-21","reda_cash":90.0,"reda_card":110.0,"ibrahim_cash":50.0,"ibrahim_card":110.0,"fawaz_cash":0,"fawaz_card":0,"total_income":360.0,"ibrahim_pct":80.0,"fawaz_pct":0.0,"net_income":280.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":250.0},{"date":"2026-05-22","reda_cash":245.0,"reda_card":60.0,"ibrahim_cash":120.0,"ibrahim_card":40.0,"fawaz_cash":0,"fawaz_card":0,"total_income":465.0,"ibrahim_pct":80.0,"fawaz_pct":0.0,"net_income":385.0,"reda_daily_expense":30.0,"shop_expense":0,"expense_details":"","total_expense":30.0,"profit":355.0}]};
+
+// =================== STATE ===================
+const STORE_KEY = 'reda_barber_dashboard_v1';
+let state = loadState();
+
+function defaultState(){
+  return {
+    barbers: [
+      { id:'reda', name:'Reda', name_ar:'رضا', commission: 0, owner: true },
+      { id:'ibrahim', name:'Ibrahim', name_ar:'إبراهيم', commission: 50, owner: false },
+      { id:'fawaz', name:'Fawaz / Ramzi', name_ar:'فواز / رمزي', commission: 50, owner: false }
+    ],
+    partners: [
+      { id:'bilal', name:'Bilal', name_ar:'بلال', share: 50 },
+      { id:'reda',  name:'Reda',  name_ar:'رضا',  share: 50 }
+    ],
+    setup: HISTORICAL.setup.slice(),
+    daily: HISTORICAL.daily.map(e => ({
+      date: e.date,
+      barbers: {
+        reda:    { cash: e.reda_cash, card: e.reda_card, commission_amt: 0 },
+        ibrahim: { cash: e.ibrahim_cash, card: e.ibrahim_card, commission_amt: e.ibrahim_pct },
+        fawaz:   { cash: e.fawaz_cash, card: e.fawaz_card, commission_amt: e.fawaz_pct }
+      },
+      reda_daily_expense: e.reda_daily_expense,
+      shop_expense: e.shop_expense,
+      expense_details: e.expense_details,
+      _orig_total_income: e.total_income,
+      _orig_net_income: e.net_income,
+      _orig_total_expense: e.total_expense,
+      _orig_profit: e.profit
+    })),
+    monthlyExtras: {},   // { "YYYY-MM": [ {id, date, category, amount, description} ] }
+    withdrawals: [],     // [ {id, date, person, amount, note} ]
+    bills: [],           // [ {id, date, supplier, category, gross, net, vat, invoice} ]
+    cardFeePct: 0.8,     // Saudi default ~0.8% (Mada). Visa/MC ~1.5-2.75%. User configurable.
+    vatRate: 15,         // Saudi VAT 15%
+    monthlyConfig: {
+      saudiPartnerMonthly: 1000,
+      rentAmount: 10000,
+      rentMonths: 3,
+      rentMode: 'amortize', // 'amortize' (3333/mo) | 'lump' (10k in payment months)
+      rentLumpMonths: []    // months that were ACTUAL paydays e.g. ["2026-02"]
+    }
+  };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      const d = defaultState();
+      // Backwards-compat: add any missing top-level fields
+      for(const k of Object.keys(d)){
+        if(s[k] === undefined) s[k] = d[k];
+      }
+      // Backwards-compat for monthlyConfig sub-fields
+      for(const k of Object.keys(d.monthlyConfig)){
+        if(s.monthlyConfig[k] === undefined) s.monthlyConfig[k] = d.monthlyConfig[k];
+      }
+      // If user previously had cardFeePct of 6 (old default) keep their value;
+      // otherwise leave as is.
+      return s;
+    }
+  }catch(e){console.warn('Load error', e);}
+  return defaultState();
+}
+function saveState(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+// =================== HELPERS ===================
+const fmt = n => (n===null||n===undefined||isNaN(n)) ? '—' : Math.round(n).toLocaleString('en-US') + ' SAR';
+const fmt0 = n => (n===null||n===undefined||isNaN(n)) ? '—' : Math.round(n).toLocaleString('en-US');
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+function deriveEntry(e){
+  // Compute total income & barber commissions on the fly
+  let total=0, totalCash=0, totalCard=0, commissionTotal=0;
+  for(const b of state.barbers){
+    const data = (e.barbers && e.barbers[b.id]) || {cash:0, card:0, commission_amt:0};
+    const cash = +data.cash || 0;
+    const card = +data.card || 0;
+    total += cash + card;
+    totalCash += cash;
+    totalCard += card;
+    if(!b.owner){
+      const computed = (b.commission/100) * (cash + card);
+      commissionTotal += (data.commission_amt > 0 ? +data.commission_amt : computed);
+    }
+  }
+  const reda_daily = +e.reda_daily_expense || 0;
+  const shop_exp = +e.shop_expense || 0;
+  const netAfterBarbers = total - commissionTotal;
+  const totalExpense = reda_daily + shop_exp;
+  // Card processing fees (Saudi default ~0.8%)
+  const cardFees = totalCard * (state.cardFeePct/100);
+  // OPERATIONAL profit = after barbers, daily exp, and card fees (BEFORE monthly fixed deductions)
+  const operationalProfit = netAfterBarbers - totalExpense - cardFees;
+  // Legacy 'profit' field — kept identical to operationalProfit for backward compat
+  const profit = operationalProfit;
+  return { total, totalCash, totalCard, commissionTotal, netAfterBarbers, totalExpense, cardFees, operationalProfit, profit, profitAfterCardFees: profit };
+}
+
+// FULL MONTHLY DERIVATION — applies fixed commitments + variable extras + partner split
+function deriveMonth(monthKey){
+  const entries = state.daily.filter(e => e.date.startsWith(monthKey));
+  let income=0, cash=0, card=0, commission=0, dailyExp=0, cardFees=0;
+  for(const e of entries){
+    const d = deriveEntry(e);
+    income += d.total; cash += d.totalCash; card += d.totalCard;
+    commission += d.commissionTotal; dailyExp += d.totalExpense; cardFees += d.cardFees;
+  }
+  const operational = income - commission - dailyExp - cardFees;
+
+  // Saudi partner monthly allowance
+  const saudiPartner = +state.monthlyConfig.saudiPartnerMonthly || 0;
+
+  // Rent allocation
+  let rentAllocation = 0;
+  const cfg = state.monthlyConfig;
+  if(cfg.rentMode === 'amortize'){
+    rentAllocation = (cfg.rentAmount || 0) / (cfg.rentMonths || 3);
+  } else {
+    // lump mode: rent only deducts in months marked as paid
+    if(Array.isArray(cfg.rentLumpMonths) && cfg.rentLumpMonths.includes(monthKey)){
+      rentAllocation = cfg.rentAmount || 0;
+    }
+  }
+
+  // Variable extras
+  const extras = (state.monthlyExtras && state.monthlyExtras[monthKey]) || [];
+  const extrasTotal = extras.reduce((s,x)=>s+(+x.amount||0), 0);
+
+  const netProfit = operational - saudiPartner - rentAllocation - extrasTotal;
+
+  // Partner split
+  const partnerShares = {};
+  let sharePct = 0;
+  for(const p of state.partners) sharePct += (+p.share||0);
+  for(const p of state.partners){
+    const pct = sharePct > 0 ? (+p.share||0)/sharePct : 0;
+    partnerShares[p.id] = { name: p.name, name_ar: p.name_ar, sharePct: pct*100, gross: netProfit * pct };
+  }
+
+  // Withdrawals by partner in this month
+  const wdThisMonth = (state.withdrawals||[]).filter(w => w.date && w.date.startsWith(monthKey));
+  const wdByPartner = {};
+  for(const p of state.partners) wdByPartner[p.id] = 0;
+  for(const w of wdThisMonth){
+    if(wdByPartner[w.person] !== undefined) wdByPartner[w.person] += (+w.amount||0);
+  }
+  for(const p of state.partners){
+    const wd = wdByPartner[p.id] || 0;
+    partnerShares[p.id].withdrawals = wd;
+    partnerShares[p.id].takehome = partnerShares[p.id].gross - wd;
+  }
+
+  return {
+    monthKey, days: entries.length,
+    income, cash, card, commission, dailyExp, cardFees,
+    operational,
+    saudiPartner, rentAllocation, extrasTotal, extras,
+    netProfit,
+    partnerShares, wdByPartner,
+    wdTotal: Object.values(wdByPartner).reduce((s,v)=>s+v,0)
+  };
+}
+
+function monthKey(dateStr){ return dateStr.slice(0,7); }
+function dayOfMonth(dateStr){ return parseInt(dateStr.slice(8,10)); }
+function weekOfMonth(dateStr){
+  // Week 1 = days 1-7, Week 2 = 8-14, Week 3 = 15-21, Week 4 = 22-end
+  const d = dayOfMonth(dateStr);
+  if(d <= 7) return 1;
+  if(d <= 14) return 2;
+  if(d <= 21) return 3;
+  return 4;
+}
+
+function sortedDaily(){
+  return state.daily.slice().sort((a,b) => a.date.localeCompare(b.date));
+}
+
+// =================== ROUTING ===================
+document.querySelectorAll('nav.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+    document.getElementById('tab-'+btn.dataset.tab).classList.remove('hidden');
+    renderCurrentTab();
+  });
+});
+function renderCurrentTab(){
+  const active = document.querySelector('nav.tabs button.active').dataset.tab;
+  switch(active){
+    case 'dashboard': renderDashboard(); break;
+    case 'entry': renderEntry(); break;
+    case 'weekly': renderWeekly(); break;
+    case 'monthly': renderMonthly(); break;
+    case 'expenses': renderMonthlyExpenses(); break;
+    case 'withdrawals': renderWithdrawals(); break;
+    case 'setup': renderSetup(); break;
+    case 'vat': renderVAT(); break;
+    case 'advisor': renderAdvisor(); break;
+    case 'marketing': renderMarketing(); break;
+    case 'settings': renderSettings(); break;
+  }
+}
+
+// =================== I18N APPLY ===================
+function applyI18n(){
+  document.documentElement.lang = LANG;
+  document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.getElementById('subtitle').textContent = t('sub');
+  document.getElementById('langBtn').textContent = LANG === 'en' ? 'العربية' : 'English';
+  renderCurrentTab();
+}
+document.getElementById('langBtn').addEventListener('click', () => {
+  LANG = LANG === 'en' ? 'ar' : 'en';
+  localStorage.setItem('lang', LANG);
+  applyI18n();
+});
+
+// =================== DASHBOARD ===================
+let charts = {};
+function destroyChart(name){ if(charts[name]) { charts[name].destroy(); delete charts[name]; }}
+
+function renderDashboard(){
+  const sorted = sortedDaily();
+  const today = todayStr();
+  // KPIs
+  const last30 = sorted.filter(e => {
+    const d = new Date(e.date), now = new Date(today);
+    return (now - d) <= 30*86400000 && (now - d) >= 0;
+  });
+  const last7 = sorted.filter(e => {
+    const d = new Date(e.date), now = new Date(today);
+    return (now - d) <= 7*86400000 && (now - d) >= 0;
+  });
+  const sum = (arr, fn) => arr.reduce((s,e)=>s+fn(deriveEntry(e)),0);
+  const tot30 = sum(last30, d => d.total);
+  const prof30 = sum(last30, d => d.profit);
+  const exp30 = sum(last30, d => d.totalExpense);
+  const tot7 = sum(last7, d => d.total);
+  const prof7 = sum(last7, d => d.profit);
+
+  // Lifetime
+  const totLife = sum(sorted, d => d.total);
+  const profLife = sum(sorted, d => d.profit);
+  const expLife = sum(sorted, d => d.totalExpense);
+  const setupTotal = state.setup.reduce((s,e)=>s+(e.expense||0),0);
+  const capitalTotal = state.setup.reduce((s,e)=>s+(e.capital||0),0);
+  const breakeven = setupTotal - profLife;
+
+  // Current month true net (after all deductions)
+  const curMonth = todayStr().slice(0,7);
+  const monthDeriv = deriveMonth(curMonth);
+  const bilalShare = monthDeriv.partnerShares['bilal'] ? monthDeriv.partnerShares['bilal'].takehome : 0;
+  const redaShare = monthDeriv.partnerShares['reda'] ? monthDeriv.partnerShares['reda'].takehome : 0;
+
+  const kpi = document.getElementById('kpiGrid');
+  kpi.innerHTML = `
+    ${kpiCard('🗓 ' + (LANG==='ar'?'دخل آخر ٧ أيام':'Income last 7 days'), fmt(tot7), '', 'up')}
+    ${kpiCard('📅 ' + (LANG==='ar'?'دخل آخر ٣٠ يوم':'Income 30 days'), fmt(tot30), last30.length+' '+t('days'))}
+    ${kpiCard('💵 ' + (LANG==='ar'?'مصاريف ٣٠ يوم':'Daily expenses 30d'), fmt(exp30))}
+    ${kpiCard('⚙️ ' + (LANG==='ar'?'ربح تشغيلي ٣٠ يوم':'Operational profit 30d'), fmt(prof30), t('operational'), prof30>=0?'up':'down')}
+    ${kpiCard('💎 ' + (LANG==='ar'?'صافي الربح الحقيقي - الشهر الحالي':'TRUE net profit (this month)'), fmt(monthDeriv.netProfit), monthLabel(curMonth), monthDeriv.netProfit>=0?'up':'down')}
+    ${kpiCard('👤 ' + (LANG==='ar'?'حصة بلال (بعد السحوبات)':'Bilal take-home'), fmt(bilalShare), '', bilalShare>=0?'up':'down')}
+    ${kpiCard('👤 ' + (LANG==='ar'?'حصة رضا (بعد السحوبات)':'Reda take-home'), fmt(redaShare), '', redaShare>=0?'up':'down')}
+    ${kpiCard('⏳ ' + (LANG==='ar'?'متبقي لاسترداد التأسيس':'Setup left to recover'), fmt(Math.max(breakeven,0)), (LANG==='ar'?'من ':'of ')+fmt(setupTotal), breakeven>0?'warn':'up')}
+  `;
+  // Charts
+  const last30sorted = last30.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const labels = last30sorted.map(e => e.date.slice(5));
+  const incomes = last30sorted.map(e => deriveEntry(e).total);
+  const profits = last30sorted.map(e => deriveEntry(e).profit);
+
+  destroyChart('income30');
+  charts.income30 = new Chart(document.getElementById('chartIncome30'), {
+    type:'bar',
+    data:{ labels, datasets:[{label:t('income'), data:incomes, backgroundColor:'#3b82f6', borderRadius:4}]},
+    options: chartOpts()
+  });
+  destroyChart('profit30');
+  charts.profit30 = new Chart(document.getElementById('chartProfit30'), {
+    type:'line',
+    data:{ labels, datasets:[{label:t('profit'), data:profits, borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.15)', fill:true, tension:0.3, pointRadius:3}]},
+    options: chartOpts()
+  });
+  // Recent table
+  renderRecentTable(sorted.slice(-10).reverse());
+  // Quick advice
+  document.getElementById('quickAdvice').innerHTML = generateAdvice(sorted, 'quick');
+}
+function kpiCard(label, val, sub='', cls=''){
+  return `<div class="card"><div class="kpi-label">${label}</div><div class="kpi-value ${cls}">${val}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
+}
+function chartOpts(){
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{labels:{color:'#94a3b8',font:{size:11}}}},
+    scales:{
+      y:{ ticks:{color:'#94a3b8'}, grid:{color:'#1e293b'}},
+      x:{ ticks:{color:'#94a3b8', maxRotation:60, minRotation:45, font:{size:10}}, grid:{display:false}}
+    }
+  };
+}
+function renderRecentTable(entries){
+  const tbl = document.getElementById('recentTable');
+  if(entries.length === 0){ tbl.innerHTML = `<tr><td>${t('nodata')}</td></tr>`; return; }
+  tbl.innerHTML = `<thead><tr>
+      <th>${t('date')}</th><th>${t('cash')}</th><th>${t('card')}</th>
+      <th>${t('income')}</th><th>${t('expense_word')}</th><th>${t('profit')}</th><th>${t('expense_details')}</th>
+    </tr></thead><tbody>
+    ${entries.map(e => {
+      const d = deriveEntry(e);
+      const pCls = d.profit > 0 ? 'pos' : d.profit < 0 ? 'neg' : 'neutral';
+      return `<tr>
+        <td>${e.date}</td>
+        <td>${fmt0(d.totalCash)}</td>
+        <td>${fmt0(d.totalCard)}</td>
+        <td><strong>${fmt0(d.total)}</strong></td>
+        <td>${fmt0(d.totalExpense)}</td>
+        <td class="${pCls}">${fmt0(d.profit)}</td>
+        <td style="max-width:280px;color:var(--muted);font-size:12px">${e.expense_details || ''}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>`;
+}
+
+// =================== ENTRY ===================
+function renderEntry(){
+  const dateInput = document.getElementById('entryDate');
+  if(!dateInput.value) dateInput.value = todayStr();
+  document.getElementById('entryDateLabel').textContent = dateInput.value;
+  renderBarberInputs();
+  // Try load existing data for today
+  loadEntryForDate(dateInput.value);
+  updateEntryPreview();
+}
+function renderBarberInputs(){
+  const wrap = document.getElementById('barberInputs');
+  wrap.innerHTML = state.barbers.map(b => {
+    const displayName = LANG==='ar' ? (b.name_ar || b.name) : b.name;
+    return `
+    <div class="barber-row">
+      <div class="head">${displayName} ${b.owner?`<span class="badge blue">${LANG==='ar'?'مالك':'owner'}</span>`:`<span class="badge green">${b.commission}%</span>`}</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>${t('cash')} (SAR)</label>
+          <input type="number" class="bcash" data-bid="${b.id}" value="0" min="0" step="0.5" onchange="updateEntryPreview()">
+        </div>
+        <div class="form-group">
+          <label>${t('card')} (SAR)</label>
+          <input type="number" class="bcard" data-bid="${b.id}" value="0" min="0" step="0.5" onchange="updateEntryPreview()">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function loadEntryForDate(date){
+  document.getElementById('entryDateLabel').textContent = date;
+  const existing = state.daily.find(e => e.date === date);
+  // reset all
+  document.querySelectorAll('.bcash, .bcard').forEach(i => i.value = 0);
+  document.getElementById('entryRedaDaily').value = 30;
+  document.getElementById('entryShopExpense').value = 0;
+  document.getElementById('entryDetails').value = '';
+  if(existing){
+    for(const b of state.barbers){
+      const data = (existing.barbers && existing.barbers[b.id]) || {cash:0, card:0};
+      const cashInput = document.querySelector(`.bcash[data-bid="${b.id}"]`);
+      const cardInput = document.querySelector(`.bcard[data-bid="${b.id}"]`);
+      if(cashInput) cashInput.value = data.cash || 0;
+      if(cardInput) cardInput.value = data.card || 0;
+    }
+    document.getElementById('entryRedaDaily').value = existing.reda_daily_expense || 30;
+    document.getElementById('entryShopExpense').value = existing.shop_expense || 0;
+    document.getElementById('entryDetails').value = existing.expense_details || '';
+  }
+  updateEntryPreview();
+}
+function collectEntryFromForm(){
+  const e = { barbers:{}, };
+  e.date = document.getElementById('entryDate').value;
+  for(const b of state.barbers){
+    const cash = +document.querySelector(`.bcash[data-bid="${b.id}"]`).value || 0;
+    const card = +document.querySelector(`.bcard[data-bid="${b.id}"]`).value || 0;
+    e.barbers[b.id] = { cash, card, commission_amt: 0 };
+  }
+  e.reda_daily_expense = +document.getElementById('entryRedaDaily').value || 0;
+  e.shop_expense = +document.getElementById('entryShopExpense').value || 0;
+  e.expense_details = document.getElementById('entryDetails').value || '';
+  return e;
+}
+function updateEntryPreview(){
+  const e = collectEntryFromForm();
+  const d = deriveEntry(e);
+  const lang = LANG;
+  document.getElementById('entryPreview').innerHTML = `
+    <div><strong>${t('income')}:</strong> ${fmt(d.total)} (${fmt0(d.totalCash)} ${t('cash')} + ${fmt0(d.totalCard)} ${t('card')})</div>
+    <div><strong>${lang==='ar'?'عمولات الحلاقين':'Barbers commission'}:</strong> ${fmt(d.commissionTotal)}</div>
+    <div><strong>${lang==='ar'?'صافي المحل':'Net to shop'}:</strong> ${fmt(d.netAfterBarbers)}</div>
+    <div><strong>${t('expense_word')}:</strong> ${fmt(d.totalExpense)}</div>
+    <div style="margin-top:6px"><strong style="color:${d.profit>=0?'var(--accent)':'var(--danger)'}">${t('profit')}: ${fmt(d.profit)}</strong></div>
+    <div class="small-text">${lang==='ar'?'تقديري بعد رسوم الشبكة':'Estimated after card fees'} (${state.cardFeePct}%): <strong>${fmt(d.profitAfterCardFees)}</strong></div>
+  `;
+}
+document.getElementById('entryDate').addEventListener('change', e => loadEntryForDate(e.target.value));
+document.getElementById('loadEntryBtn').addEventListener('click', () => loadEntryForDate(document.getElementById('entryDate').value));
+document.getElementById('entryRedaDaily').addEventListener('input', updateEntryPreview);
+document.getElementById('entryShopExpense').addEventListener('input', updateEntryPreview);
+
+document.getElementById('saveEntryBtn').addEventListener('click', () => {
+  const e = collectEntryFromForm();
+  if(!e.date){ alert('Pick a date'); return; }
+  const idx = state.daily.findIndex(x => x.date === e.date);
+  if(idx >= 0){ state.daily[idx] = e; } else { state.daily.push(e); }
+  saveState();
+  toast(t('saved'));
+  renderDashboard();
+});
+document.getElementById('deleteEntryBtn').addEventListener('click', () => {
+  const date = document.getElementById('entryDate').value;
+  if(!confirm(t('confirm_delete'))) return;
+  state.daily = state.daily.filter(e => e.date !== date);
+  saveState();
+  loadEntryForDate(date);
+  toast(t('saved'));
+});
+
+// =================== WEEKLY ===================
+function renderWeekly(){
+  // Build month options
+  const months = [...new Set(state.daily.map(e => monthKey(e.date)))].sort();
+  const select = document.getElementById('weeklyMonth');
+  if(!select.dataset.populated){
+    select.innerHTML = months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+    select.value = months[months.length-1];
+    select.dataset.populated = '1';
+    select.addEventListener('change', renderWeeklyContent);
+  } else {
+    select.innerHTML = months.map(m => `<option value="${m}" ${m===select.value?'selected':''}>${monthLabel(m)}</option>`).join('');
+  }
+  renderWeeklyContent();
+}
+function monthLabel(m){
+  const [y, mm] = m.split('-');
+  const names_en = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const names_ar = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return (LANG==='ar' ? names_ar : names_en)[parseInt(mm)-1] + ' ' + y;
+}
+let selectedWeek = 1;
+function renderWeeklyContent(){
+  const month = document.getElementById('weeklyMonth').value;
+  const monthEntries = state.daily.filter(e => monthKey(e.date) === month);
+  const tabs = document.getElementById('weekTabs');
+  tabs.innerHTML = [1,2,3,4].map(w => {
+    const dates = w===1?'1-7':w===2?'8-14':w===3?'15-21':'22-31';
+    return `<button class="${w===selectedWeek?'active':''}" data-w="${w}">${LANG==='ar'?'الأسبوع':'Week'} ${w} <span class="small-text">(${dates})</span></button>`;
+  }).join('');
+  tabs.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { selectedWeek = +b.dataset.w; renderWeeklyContent(); }));
+
+  const weekEntries = monthEntries.filter(e => weekOfMonth(e.date) === selectedWeek).sort((a,b)=>a.date.localeCompare(b.date));
+  const sums = weekEntries.reduce((acc,e) => {
+    const d = deriveEntry(e);
+    acc.income += d.total; acc.cash += d.totalCash; acc.card += d.totalCard;
+    acc.commission += d.commissionTotal; acc.expense += d.totalExpense; acc.profit += d.profit;
+    return acc;
+  }, {income:0, cash:0, card:0, commission:0, expense:0, profit:0});
+  const avg = weekEntries.length ? sums.income/weekEntries.length : 0;
+  const profits = weekEntries.map(e => deriveEntry(e).profit);
+  const incomes = weekEntries.map(e => deriveEntry(e).total);
+
+  document.getElementById('weeklyKpis').innerHTML = `
+    ${kpiCard('💵 '+t('income'), fmt(sums.income), weekEntries.length+' '+t('days'))}
+    ${kpiCard('💰 '+t('profit'), fmt(sums.profit), '', sums.profit>=0?'up':'down')}
+    ${kpiCard('💸 '+t('expense_word'), fmt(sums.expense))}
+    ${kpiCard('📊 '+t('avg')+'/'+t('days'), fmt(avg))}
+    ${kpiCard('⬆️ '+t('max'), fmt(Math.max(0,...incomes)))}
+    ${kpiCard('⬇️ '+t('min'), fmt(weekEntries.length?Math.min(...incomes):0))}
+  `;
+  // Table
+  const tbl = document.getElementById('weeklyTable');
+  if(weekEntries.length === 0){ tbl.innerHTML = `<tr><td>${t('nodata')}</td></tr>`; }
+  else {
+    tbl.innerHTML = `<thead><tr>
+        <th>${t('date')}</th><th>${t('income')}</th><th>${LANG==='ar'?'عمولة':'Commission'}</th>
+        <th>${t('expense_word')}</th><th>${t('profit')}</th></tr></thead><tbody>
+      ${weekEntries.map(e => {
+        const d = deriveEntry(e);
+        return `<tr>
+          <td>${e.date}</td>
+          <td>${fmt0(d.total)}</td>
+          <td>${fmt0(d.commissionTotal)}</td>
+          <td>${fmt0(d.totalExpense)}</td>
+          <td class="${d.profit>=0?'pos':'neg'}">${fmt0(d.profit)}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>`;
+  }
+  // Chart
+  destroyChart('week');
+  charts.week = new Chart(document.getElementById('chartWeek'), {
+    type:'bar',
+    data:{
+      labels: weekEntries.map(e => e.date.slice(8)),
+      datasets:[
+        {label: t('income'), data: incomes, backgroundColor:'#3b82f6'},
+        {label: t('profit'), data: profits, backgroundColor:'#22c55e'}
+      ]
+    }, options: chartOpts()
+  });
+  // Advice
+  document.getElementById('weeklyAdvice').innerHTML = generateWeekAdvice(weekEntries, sums, month, selectedWeek);
+}
+
+// =================== MONTHLY ===================
+function renderMonthly(){
+  const months = [...new Set(state.daily.map(e => monthKey(e.date)))].sort();
+  const monthData = months.map(m => {
+    const d = deriveMonth(m);
+    return {
+      month: m, days: d.days,
+      income: d.income, cash: d.cash, card: d.card,
+      commission: d.commission, expense: d.dailyExp,
+      cardFees: d.cardFees, operational: d.operational,
+      saudiPartner: d.saudiPartner, rentAllocation: d.rentAllocation,
+      extrasTotal: d.extrasTotal, netProfit: d.netProfit,
+      avg: d.days ? d.income/d.days : 0,
+      partnerShares: d.partnerShares
+    };
+  });
+  // overwrite the `profit` field used by some charts to be the TRUE net profit
+  monthData.forEach(m => { m.profit = m.netProfit; });
+  // KPIs
+  const lastM = monthData[monthData.length-1];
+  const prevM = monthData[monthData.length-2];
+  const trend = (prevM && prevM.income>0) ? ((lastM.income - prevM.income)/prevM.income*100) : null;
+  document.getElementById('monthlyKpis').innerHTML = `
+    ${kpiCard('🏆 '+(LANG==='ar'?'أفضل شهر':'Best month'),
+      (() => {const best = monthData.reduce((a,b)=>b.income>a.income?b:a, monthData[0]); return monthLabel(best.month);})(),
+      fmt(Math.max(...monthData.map(m=>m.income))))}
+    ${kpiCard('📈 '+(LANG==='ar'?'الاتجاه':'Trend MoM'),
+      trend===null?'—':(trend>=0?'+':'')+trend.toFixed(1)+'%', '', trend>=0?'up':'down')}
+    ${kpiCard('💰 '+(LANG==='ar'?'متوسط ربح شهري':'Avg monthly profit'),
+      fmt(monthData.reduce((s,m)=>s+m.profit,0)/monthData.length))}
+    ${kpiCard('💵 '+(LANG==='ar'?'إجمالي الدخل':'Total income'),
+      fmt(monthData.reduce((s,m)=>s+m.income,0)))}
+  `;
+  // Charts
+  destroyChart('monthIncome');
+  charts.monthIncome = new Chart(document.getElementById('chartMonthIncome'), {
+    type:'bar',
+    data:{
+      labels: monthData.map(m => monthLabel(m.month)),
+      datasets:[
+        {label: t('cash'), data: monthData.map(m => m.cash), backgroundColor:'#22c55e', stack:'a'},
+        {label: t('card'), data: monthData.map(m => m.card), backgroundColor:'#3b82f6', stack:'a'}
+      ]
+    },
+    options: { ...chartOpts(), scales:{ y:{stacked:true, ticks:{color:'#94a3b8'}, grid:{color:'#1e293b'}}, x:{stacked:true, ticks:{color:'#94a3b8'}, grid:{display:false}}}}
+  });
+  destroyChart('monthProfit');
+  charts.monthProfit = new Chart(document.getElementById('chartMonthProfit'), {
+    type:'bar',
+    data:{
+      labels: monthData.map(m => monthLabel(m.month)),
+      datasets:[
+        {label: t('expense_word'), data: monthData.map(m => m.expense), backgroundColor:'#ef4444'},
+        {label: t('profit'), data: monthData.map(m => m.profit), backgroundColor:'#22c55e'}
+      ]
+    }, options: chartOpts()
+  });
+  // Table — full deduction chain
+  const tbl = document.getElementById('monthlyTable');
+  tbl.innerHTML = `<thead><tr>
+      <th>${LANG==='ar'?'الشهر':'Month'}</th>
+      <th>${t('income')}</th>
+      <th>${LANG==='ar'?'(−) عمولات':'(−) Commission'}</th>
+      <th>${LANG==='ar'?'(−) مصاريف يومية':'(−) Daily exp.'}</th>
+      <th>${LANG==='ar'?'(−) رسوم شبكة':'(−) Card fees'}</th>
+      <th>${LANG==='ar'?'تشغيلي':'Operational'}</th>
+      <th>${LANG==='ar'?'(−) شريك سعودي':'(−) Saudi partner'}</th>
+      <th>${LANG==='ar'?'(−) إيجار':'(−) Rent'}</th>
+      <th>${LANG==='ar'?'(−) متغيرات':'(−) Variable'}</th>
+      <th><strong>${LANG==='ar'?'صافي الربح':'NET PROFIT'}</strong></th>
+      <th>${LANG==='ar'?'حصة بلال':'Bilal share'}</th>
+      <th>${LANG==='ar'?'حصة رضا':'Reda share'}</th>
+    </tr></thead><tbody>
+    ${monthData.map(m => `<tr>
+        <td><strong>${monthLabel(m.month)}</strong><br><span class="small-text">${m.days} ${t('days')}</span></td>
+        <td>${fmt0(m.income)}</td>
+        <td class="neg">−${fmt0(m.commission)}</td>
+        <td class="neg">−${fmt0(m.expense)}</td>
+        <td class="neg">−${fmt0(m.cardFees)}</td>
+        <td>${fmt0(m.operational)}</td>
+        <td class="neg">−${fmt0(m.saudiPartner)}</td>
+        <td class="neg">−${fmt0(m.rentAllocation)}</td>
+        <td class="neg">−${fmt0(m.extrasTotal)}</td>
+        <td class="${m.netProfit>=0?'pos':'neg'}"><strong>${fmt0(m.netProfit)}</strong></td>
+        <td class="${m.partnerShares.bilal && m.partnerShares.bilal.takehome>=0?'pos':'neg'}">${m.partnerShares.bilal?fmt0(m.partnerShares.bilal.takehome):'—'}</td>
+        <td class="${m.partnerShares.reda && m.partnerShares.reda.takehome>=0?'pos':'neg'}">${m.partnerShares.reda?fmt0(m.partnerShares.reda.takehome):'—'}</td>
+      </tr>`).join('')}
+    </tbody>`;
+}
+
+// =================== MONTHLY EXPENSES ===================
+function populateMonthSelect(selectId){
+  const months = [...new Set([...state.daily.map(e=>monthKey(e.date)), todayStr().slice(0,7)])].sort();
+  const sel = document.getElementById(selectId);
+  const prev = sel.value;
+  sel.innerHTML = months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+  if(prev && months.includes(prev)) sel.value = prev;
+  else sel.value = months[months.length-1];
+}
+function renderMonthlyExpenses(){
+  populateMonthSelect('expensesMonth');
+  const sel = document.getElementById('expensesMonth');
+  if(!sel.dataset.bound){ sel.addEventListener('change', renderExpensesContent); sel.dataset.bound='1'; }
+  document.getElementById('expenseDate').value = todayStr();
+  renderExpensesContent();
+}
+function renderExpensesContent(){
+  const month = document.getElementById('expensesMonth').value;
+  const d = deriveMonth(month);
+  const cfg = state.monthlyConfig;
+  // KPI summary
+  document.getElementById('expensesKpis').innerHTML = `
+    ${kpiCard('💵 '+(LANG==='ar'?'دخل الشهر':'Income'), fmt(d.income))}
+    ${kpiCard('⚙️ '+(LANG==='ar'?'تشغيلي':'Operational'), fmt(d.operational))}
+    ${kpiCard('🔻 '+(LANG==='ar'?'خصومات شهرية':'Monthly deductions'), fmt(d.saudiPartner + d.rentAllocation + d.extrasTotal))}
+    ${kpiCard('💎 '+(LANG==='ar'?'صافي الربح':'Net profit'), fmt(d.netProfit), '', d.netProfit>=0?'up':'down')}
+  `;
+  // Fixed table
+  const isLumpMonth = cfg.rentMode==='lump' && (cfg.rentLumpMonths||[]).includes(month);
+  document.getElementById('fixedExpensesTable').innerHTML = `<thead><tr>
+      <th>${t('me_cat')}</th><th>${t('me_amount')}</th><th>${t('me_descr')}</th><th>${t('action')}</th>
+    </tr></thead><tbody>
+    <tr>
+      <td>🤝 ${t('saudi_partner')}</td>
+      <td>${fmt0(cfg.saudiPartnerMonthly)}</td>
+      <td class="small-text">${LANG==='ar'?'مبلغ شهري ثابت — يُعدّل من الإعدادات':'Fixed monthly — edit in Settings'}</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>🏠 ${t('rent_alloc')}</td>
+      <td>${fmt0(cfg.rentMode==='amortize' ? (cfg.rentAmount/cfg.rentMonths) : (isLumpMonth ? cfg.rentAmount : 0))}</td>
+      <td class="small-text">${cfg.rentMode==='amortize'
+        ? (LANG==='ar'?`تقسيم ${fmt0(cfg.rentAmount)} على ${cfg.rentMonths} أشهر`:`Amortized ${fmt0(cfg.rentAmount)} over ${cfg.rentMonths} months`)
+        : (isLumpMonth
+          ? (LANG==='ar'?'دفعة كاملة هذا الشهر':'Lump payment this month')
+          : (LANG==='ar'?'لم يحن وقت الدفع':'Not a payment month'))}</td>
+      <td>${cfg.rentMode==='lump' ? `<button class="btn" onclick="toggleLumpRent('${month}')">${isLumpMonth?(LANG==='ar'?'إلغاء':'Unmark'):(LANG==='ar'?'وضع علامة دُفع':'Mark paid')}</button>`:''}</td>
+    </tr>
+    </tbody>`;
+  // Variable table
+  const extras = (state.monthlyExtras && state.monthlyExtras[month]) || [];
+  document.getElementById('variableExpensesTable').innerHTML = `<thead><tr>
+      <th>${t('me_date')}</th><th>${t('me_cat')}</th><th>${t('me_amount')}</th><th>${t('me_descr')}</th><th>${t('action')}</th>
+    </tr></thead><tbody>
+    ${extras.length === 0 ? `<tr><td colspan="5" class="neutral">${t('nodata')}</td></tr>` :
+      extras.map(x => `<tr>
+        <td>${x.date||'—'}</td>
+        <td>${categoryLabel(x.category)}</td>
+        <td>${fmt0(x.amount)}</td>
+        <td>${x.description||''}</td>
+        <td><button class="btn danger" onclick="removeExtra('${month}','${x.id}')">×</button></td>
+      </tr>`).join('')
+    }
+    <tr style="background:var(--card2);font-weight:700">
+      <td colspan="2">TOTAL</td><td>${fmt0(d.extrasTotal)}</td><td colspan="2"></td>
+    </tr>
+    </tbody>`;
+}
+function categoryLabel(c){
+  const labels_en = {electricity:'⚡ Electricity', water:'💧 Water', internet:'📶 Internet',
+    violation:'🚨 Violation', rent_lump:'🏠 Rent payment', supplies:'🧴 Supplies',
+    maintenance:'🔧 Maintenance', marketing:'📢 Marketing', other:'📝 Other'};
+  const labels_ar = {electricity:'⚡ كهرباء', water:'💧 ماء', internet:'📶 إنترنت',
+    violation:'🚨 مخالفة', rent_lump:'🏠 إيجار', supplies:'🧴 مستلزمات',
+    maintenance:'🔧 صيانة', marketing:'📢 تسويق', other:'📝 أخرى'};
+  return (LANG==='ar'?labels_ar:labels_en)[c] || c;
+}
+function removeExtra(month, id){
+  if(!confirm(LANG==='ar'?'حذف هذا المصروف؟':'Delete this expense?')) return;
+  state.monthlyExtras[month] = (state.monthlyExtras[month]||[]).filter(x => x.id !== id);
+  saveState();
+  renderExpensesContent();
+}
+function toggleLumpRent(month){
+  const arr = state.monthlyConfig.rentLumpMonths || [];
+  const idx = arr.indexOf(month);
+  if(idx >= 0) arr.splice(idx,1); else arr.push(month);
+  state.monthlyConfig.rentLumpMonths = arr;
+  saveState();
+  renderExpensesContent();
+}
+
+// =================== WITHDRAWALS ===================
+function renderWithdrawals(){
+  populateMonthSelect('withdrawalsMonth');
+  const sel = document.getElementById('withdrawalsMonth');
+  if(!sel.dataset.bound){ sel.addEventListener('change', renderWithdrawalsContent); sel.dataset.bound='1'; }
+  document.getElementById('wdDate').value = todayStr();
+  // populate person dropdown
+  const ps = document.getElementById('wdPerson');
+  ps.innerHTML = state.partners.map(p => `<option value="${p.id}">${LANG==='ar'?(p.name_ar||p.name):p.name}</option>`).join('');
+  renderWithdrawalsContent();
+}
+function renderWithdrawalsContent(){
+  const month = document.getElementById('withdrawalsMonth').value;
+  const d = deriveMonth(month);
+  // KPI per partner
+  const cards = state.partners.map(p => {
+    const ps = d.partnerShares[p.id];
+    if(!ps) return '';
+    const name = LANG==='ar'?(p.name_ar||p.name):p.name;
+    return `<div class="card">
+      <div class="kpi-label">👤 ${name}</div>
+      <div class="kpi-value ${ps.takehome>=0?'up':'down'}">${fmt(ps.takehome)}</div>
+      <div class="kpi-sub">${LANG==='ar'?'حصة':'Gross'} ${fmt0(ps.gross)} − ${LANG==='ar'?'سحوبات':'wd'} ${fmt0(ps.withdrawals)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('withdrawalsKpis').innerHTML = cards;
+  // Table
+  const wds = (state.withdrawals||[]).filter(w => w.date && w.date.startsWith(month)).sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('withdrawalsTable').innerHTML = `<thead><tr>
+      <th>${t('wd_date')}</th><th>${t('wd_who')}</th><th>${t('wd_amount')}</th><th>${t('wd_note')}</th><th>${t('action')}</th>
+    </tr></thead><tbody>
+    ${wds.length===0 ? `<tr><td colspan="5" class="neutral">${t('nodata')}</td></tr>` :
+      wds.map(w => {
+        const p = state.partners.find(p=>p.id===w.person);
+        const pname = p ? (LANG==='ar'?(p.name_ar||p.name):p.name) : w.person;
+        return `<tr>
+          <td>${w.date}</td>
+          <td>${pname}</td>
+          <td>${fmt0(w.amount)}</td>
+          <td>${w.note||''}</td>
+          <td><button class="btn danger" onclick="removeWd('${w.id}')">×</button></td>
+        </tr>`;
+      }).join('')
+    }
+    </tbody>`;
+}
+function removeWd(id){
+  if(!confirm(LANG==='ar'?'حذف هذا السحب؟':'Delete this withdrawal?')) return;
+  state.withdrawals = (state.withdrawals||[]).filter(w => w.id !== id);
+  saveState();
+  renderWithdrawalsContent();
+}
+
+// =================== VAT / BILLS ===================
+function renderVAT(){
+  populateMonthSelect('vatMonth');
+  const sel = document.getElementById('vatMonth');
+  if(!sel.dataset.bound){ sel.addEventListener('change', renderVATContent); sel.dataset.bound='1'; }
+  document.getElementById('billDate').value = todayStr();
+  renderVATContent();
+}
+function renderVATContent(){
+  const month = document.getElementById('vatMonth').value;
+  const bills = (state.bills||[]).filter(b => b.date && b.date.startsWith(month));
+  const totalGross = bills.reduce((s,b)=>s+(+b.gross||0),0);
+  const totalVAT = bills.reduce((s,b)=>s+(+b.vat||0),0);
+  const totalNet = totalGross - totalVAT;
+  // Output VAT estimate from this month's income (if VAT-registered, you charge 15% on top of services)
+  const d = deriveMonth(month);
+  const outputVATEst = d.income - (d.income / (1 + state.vatRate/100));
+  const netVATPayable = outputVATEst - totalVAT;
+
+  document.getElementById('vatKpis').innerHTML = `
+    ${kpiCard('🧾 '+(LANG==='ar'?'إجمالي الفواتير (شامل)':'Bills total (gross)'), fmt(totalGross), bills.length+' '+(LANG==='ar'?'فاتورة':'bills'))}
+    ${kpiCard('🔹 '+(LANG==='ar'?'صافي قبل الضريبة':'Net (excl. VAT)'), fmt(totalNet))}
+    ${kpiCard('📥 '+(LANG==='ar'?'ضريبة المدخلات (مستردة)':'Input VAT (reclaimable)'), fmt(totalVAT), '', 'up')}
+    ${kpiCard('📤 '+(LANG==='ar'?'ضريبة المخرجات (تقديرية)':'Output VAT (est. on income)'), fmt(outputVATEst), (LANG==='ar'?'إذا كنت مسجل ضريبيًا':'If VAT-registered'))}
+    ${kpiCard('💳 '+(LANG==='ar'?'صافي الضريبة المستحقة':'Net VAT payable'), fmt(Math.max(0,netVATPayable)), '', netVATPayable<=0?'up':'warn')}
+  `;
+  document.getElementById('vatTable').innerHTML = `<thead><tr>
+      <th>${t('vat_date')}</th><th>${t('vat_supplier')}</th><th>${t('vat_cat')}</th>
+      <th>${t('nx_net')}</th><th>${t('nx_vat')}</th><th>${t('nx_total')}</th>
+      <th>${t('vat_invoice')}</th><th>${t('action')}</th>
+    </tr></thead><tbody>
+    ${bills.length===0 ? `<tr><td colspan="8" class="neutral">${t('nodata')}</td></tr>` :
+      bills.map(b => `<tr>
+        <td>${b.date}</td>
+        <td>${b.supplier||'—'}</td>
+        <td>${b.category||'—'}</td>
+        <td>${fmt0(b.net)}</td>
+        <td>${fmt0(b.vat)}</td>
+        <td><strong>${fmt0(b.gross)}</strong></td>
+        <td>${b.invoice||''}</td>
+        <td><button class="btn danger" onclick="removeBill('${b.id}')">×</button></td>
+      </tr>`).join('')
+    }
+    </tbody>`;
+}
+function removeBill(id){
+  if(!confirm(LANG==='ar'?'حذف هذه الفاتورة؟':'Delete this bill?')) return;
+  state.bills = (state.bills||[]).filter(b => b.id !== id);
+  saveState();
+  renderVATContent();
+}
+
+// =================== SETUP COSTS ===================
+function renderSetup(){
+  const total = state.setup.reduce((s,e)=>s+(e.expense||0),0);
+  const cap = state.setup.reduce((s,e)=>s+(e.capital||0),0);
+  // Recovered = sum of TRUE net profit (after all deductions) across all months
+  const months = [...new Set(state.daily.map(e => monthKey(e.date)))].sort();
+  let recovered = 0;
+  for(const m of months){ recovered += deriveMonth(m).netProfit; }
+  const remaining = Math.max(0, total - recovered);
+  const pctRecovered = total>0 ? Math.min(100, (recovered/total)*100) : 0;
+  document.getElementById('setupKpis').innerHTML = `
+    ${kpiCard('🏗 '+(LANG==='ar'?'إجمالي تكلفة التأسيس':'Total setup spent'), fmt(total))}
+    ${kpiCard('💰 '+(LANG==='ar'?'رأس المال':'Capital contributed'), fmt(cap))}
+    ${kpiCard('🎯 '+(LANG==='ar'?'تم استرداده':'Recovered (from true net)'), fmt(Math.min(recovered, total)), pctRecovered.toFixed(1)+'%', 'up')}
+    ${kpiCard('⏳ '+(LANG==='ar'?'متبقي للاسترداد':'Remaining to recover'), fmt(remaining), '', remaining>0?'warn':'up')}
+  `;
+  const tbl = document.getElementById('setupTable');
+  tbl.innerHTML = `<thead><tr>
+      <th>${t('date')}</th><th>${t('capital')}</th><th>${t('expense')}</th><th>${t('description')}</th><th></th>
+    </tr></thead><tbody>
+    ${state.setup.map((e,i)=>`<tr>
+      <td>${e.date||'—'}</td>
+      <td>${e.capital?fmt0(e.capital):'—'}</td>
+      <td>${e.expense?fmt0(e.expense):'—'}</td>
+      <td>${e.description||''}</td>
+      <td><button class="btn danger" onclick="removeSetup(${i})">×</button></td>
+    </tr>`).join('')}
+    <tr style="background:var(--card2);font-weight:700">
+      <td>TOTAL</td><td>${fmt0(cap)}</td><td>${fmt0(total)}</td><td></td><td></td>
+    </tr>
+    </tbody>`;
+}
+function removeSetup(i){ state.setup.splice(i,1); saveState(); renderSetup(); }
+document.getElementById('addSetupBtn').addEventListener('click', () => {
+  const e = {
+    date: document.getElementById('setupDate').value,
+    capital: +document.getElementById('setupCapital').value || 0,
+    expense: +document.getElementById('setupExpense').value || 0,
+    description: document.getElementById('setupDesc').value
+  };
+  state.setup.push(e);
+  saveState();
+  document.getElementById('setupCapital').value = 0;
+  document.getElementById('setupExpense').value = 0;
+  document.getElementById('setupDesc').value = '';
+  renderSetup();
+  toast(t('saved'));
+});
+
+// =================== AI ADVISOR ===================
+function generateAdvice(entries, mode='full'){
+  if(entries.length === 0) return `<p>${t('nodata')}</p>`;
+  const sorted = entries.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const last7 = sorted.slice(-7);
+  const prev7 = sorted.slice(-14, -7);
+  const last30 = sorted.slice(-30);
+  const last7sum = last7.reduce((a,e)=>a+deriveEntry(e).total, 0);
+  const prev7sum = prev7.reduce((a,e)=>a+deriveEntry(e).total, 0);
+  const advices = [];
+
+  // Trend
+  if(prev7sum > 0){
+    const change = (last7sum - prev7sum) / prev7sum * 100;
+    if(change > 15){
+      advices.push({type:'good', icon:'📈', title: LANG==='ar'?'الدخل في تصاعد':'Income trending up',
+        body: LANG==='ar'?`دخل آخر ٧ أيام أعلى بـ ${change.toFixed(0)}% من الأسبوع السابق. واصل ما تفعله، وفكّر في رفع الأسعار قليلًا للخدمات الأكثر طلبًا، أو تثبيت طاقم العمل في أيام الذروة.`
+            :`Last 7 days are ${change.toFixed(0)}% higher than the prior 7 days. Keep doing what's working — consider a small price bump on your most-booked services and locking down staff for peak days.`});
+    } else if(change < -15){
+      advices.push({type:'bad', icon:'⚠️', title: LANG==='ar'?'تراجع في الدخل':'Income dropped',
+        body: LANG==='ar'?`دخل آخر ٧ أيام أقل بـ ${Math.abs(change).toFixed(0)}% من الأسبوع السابق. راجع: هل توقفت إعلانات؟ هل غاب أحد الحلاقين؟ هل كانت إجازة/عطلة؟ ادفع إعلان واتساب/سناب صغير قبل الويكاند.`
+            :`Last 7 days dropped ${Math.abs(change).toFixed(0)}% vs prior week. Check: did ads pause? Was a barber out? Holiday? Push a small WhatsApp/Snap promo before this weekend.`});
+    }
+  }
+
+  // Day-of-week analysis
+  if(sorted.length >= 14){
+    const dow = {0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
+    for(const e of sorted){ dow[new Date(e.date).getDay()].push(deriveEntry(e).total); }
+    const dowAvg = Object.entries(dow).map(([d,arr]) => ({day:+d, avg: arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0, count:arr.length}));
+    dowAvg.sort((a,b)=>b.avg-a.avg);
+    const dayNames_en = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const dayNames_ar = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+    const dayNames = LANG==='ar'?dayNames_ar:dayNames_en;
+    const best = dowAvg[0], worst = dowAvg[6];
+    advices.push({type:'info', icon:'📅', title: LANG==='ar'?'أفضل وأسوأ أيام':'Best & worst days',
+      body: LANG==='ar'
+        ?`أفضل يوم لك هو <strong>${dayNames[best.day]}</strong> بمتوسط ${fmt(best.avg)}، والأضعف هو <strong>${dayNames[worst.day]}</strong> بمتوسط ${fmt(worst.avg)}. خصم/عرض خاص (مثلاً قص + لحية بسعر مخفض) يوم ${dayNames[worst.day]} هو فرصة سهلة للدخل.`
+        :`Your best day is <strong>${dayNames[best.day]}</strong> averaging ${fmt(best.avg)}; your weakest is <strong>${dayNames[worst.day]}</strong> averaging ${fmt(worst.avg)}. Run a discounted combo (e.g. cut + beard combo) on ${dayNames[worst.day]} to lift your softest day.`
+    });
+  }
+
+  // Card vs cash mix
+  const last30data = last30.map(e => deriveEntry(e));
+  const totalCard = last30data.reduce((s,d)=>s+d.totalCard,0);
+  const totalCash = last30data.reduce((s,d)=>s+d.totalCash,0);
+  if(totalCard + totalCash > 0){
+    const cardPct = totalCard / (totalCash + totalCard) * 100;
+    const monthlyCardFees = totalCard * (state.cardFeePct/100);
+    if(cardPct > 55){
+      advices.push({type:'warn', icon:'💳', title: LANG==='ar'?'نسبة الشبكة عالية':'Card mix is high',
+        body: LANG==='ar'
+          ?`${cardPct.toFixed(0)}% من المبيعات شبكة. هذا يعني رسوم تقدّر بـ ~${fmt(monthlyCardFees)} لكل ٣٠ يوم (بمعدل ${state.cardFeePct}%). فاوض البنك على عمولة أقل إذا أمكن.`
+          :`${cardPct.toFixed(0)}% of sales are on card. That's ~${fmt(monthlyCardFees)} in card fees per 30 days (at ${state.cardFeePct}%). Renegotiate with your processor if possible.`
+      });
+    }
+  }
+
+  // Expense ratio
+  const last30totIncome = last30data.reduce((s,d)=>s+d.total,0);
+  const last30totExp = last30data.reduce((s,d)=>s+d.totalExpense,0);
+  if(last30totIncome > 0){
+    const expRatio = last30totExp / last30totIncome * 100;
+    if(expRatio > 40){
+      advices.push({type:'warn', icon:'💸', title: LANG==='ar'?'المصاريف مرتفعة':'Expenses are high',
+        body: LANG==='ar'
+          ?`نسبة المصاريف اليومية ${expRatio.toFixed(0)}% من الدخل. الصحي للبرشوب أقل من 30%. راجع المصاريف المتكررة وفكر في شراء جمالي شهري بدل يومي.`
+          :`Your daily expense ratio is ${expRatio.toFixed(0)}% of income. Healthy barbershops sit below 30%. Audit recurring items and try monthly bulk-buying instead of weekly.`
+      });
+    } else if(expRatio < 20){
+      advices.push({type:'good', icon:'✅', title: LANG==='ar'?'تحكم ممتاز بالمصاريف':'Great expense control',
+        body: LANG==='ar'?`نسبة المصاريف ${expRatio.toFixed(0)}% فقط — هذا ممتاز. تأكد فقط من عدم تأجيل صيانة لازمة.`
+              :`Daily expenses at only ${expRatio.toFixed(0)}% — excellent. Just make sure you're not deferring needed maintenance.`});
+    }
+  }
+
+  // High variance / inconsistency
+  if(last30.length >= 14){
+    const incomes = last30data.map(d=>d.total);
+    const avg = incomes.reduce((a,b)=>a+b,0)/incomes.length;
+    const variance = incomes.reduce((s,v)=>s+Math.pow(v-avg,2),0)/incomes.length;
+    const stdev = Math.sqrt(variance);
+    const cv = avg > 0 ? stdev / avg : 0;
+    if(cv > 0.5){
+      advices.push({type:'info', icon:'📊', title: LANG==='ar'?'تذبذب يومي عالي':'High day-to-day swings',
+        body: LANG==='ar'
+          ?`متوسط الدخل اليومي ${fmt(avg)} لكن الانحراف عالي (±${fmt(stdev)}). فكر في إطلاق نظام حجز مسبق + رسائل تذكير لتثبيت العملاء على أيام معينة.`
+          :`Daily income averages ${fmt(avg)} but swings by ±${fmt(stdev)}. Implement appointment booking + reminder SMS to stabilize bookings on slower days.`
+      });
+    }
+  }
+
+  // Loss streak
+  const lastNeg = (() => { let s=0; for(const e of [...sorted].reverse()){ if(deriveEntry(e).profit<0)s++; else break;} return s;})();
+  if(lastNeg >= 3){
+    advices.push({type:'bad', icon:'🚨', title: LANG==='ar'?'٣ أيام خسارة متتالية':'3+ loss days in a row',
+      body: LANG==='ar'
+        ?`الأرباح سلبية ${lastNeg} أيام متتالية. ابدأ فورًا: (1) إعلان واتساب لقاعدتك (2) تأكد من حضور كل الحلاقين (3) راجع المصاريف الكبيرة بهذه الأيام.`
+        :`Profit has been negative ${lastNeg} consecutive days. Act now: (1) WhatsApp blast to your existing list, (2) confirm all barbers are showing up, (3) check for unusually large recent expenses.`
+    });
+  }
+
+  // Barber performance
+  if(last30.length >= 5){
+    const byBarber = {};
+    for(const b of state.barbers){
+      byBarber[b.id] = {name: LANG==='ar'?(b.name_ar||b.name):b.name, total:0};
+    }
+    for(const e of last30){
+      for(const b of state.barbers){
+        const bd = (e.barbers && e.barbers[b.id]) || {cash:0, card:0};
+        byBarber[b.id].total += (+bd.cash || 0) + (+bd.card || 0);
+      }
+    }
+    const ranking = Object.values(byBarber).sort((a,b)=>b.total-a.total);
+    const totalAll = ranking.reduce((s,b)=>s+b.total,0);
+    if(totalAll > 0){
+      const topPct = ranking[0].total/totalAll*100;
+      advices.push({type:'info', icon:'✂️', title: LANG==='ar'?'أداء الحلاقين':'Barber performance',
+        body: ranking.map(r => `<strong>${r.name}:</strong> ${fmt(r.total)} (${(r.total/totalAll*100).toFixed(0)}%)`).join(' • ') +
+          (topPct > 60 ? (LANG==='ar'?'<br><br>اعتماد كبير على شخص واحد — خطر إذا غاب. خطط لاجتذاب عميل ثاني/تطوير الحلاق الأضعف.'
+                                    :'<br><br>Heavy reliance on one person — risky if they leave. Plan to develop the weaker barber or attract a second strong one.') : '')
+      });
+    }
+  }
+
+  // True net profit advice for current month
+  const curMonth = todayStr().slice(0,7);
+  const monthDeriv = deriveMonth(curMonth);
+  if(monthDeriv.days >= 5 && monthDeriv.netProfit < 0){
+    advices.push({type:'bad', icon:'🔻', title: LANG==='ar'?'صافي الربح سالب للشهر الحالي':'Negative net profit this month',
+      body: LANG==='ar'
+        ?`بعد كل الخصومات (شريك سعودي ${fmt(monthDeriv.saudiPartner)}، إيجار ${fmt(monthDeriv.rentAllocation)}، رسوم شبكة ${fmt(monthDeriv.cardFees)})، الصافي ${fmt(monthDeriv.netProfit)}. الشهر لم ينتهي — ركز على ٧-١٠ أيام القادمة وفعّل عرض الويكاند.`
+        :`After all deductions (Saudi partner ${fmt(monthDeriv.saudiPartner)}, rent ${fmt(monthDeriv.rentAllocation)}, card fees ${fmt(monthDeriv.cardFees)}), net is ${fmt(monthDeriv.netProfit)}. Month isn't over — focus on the next 7-10 days and activate weekend offers.`
+    });
+  }
+
+  if(mode === 'quick') return advices.slice(0,2).map(adviceHtml).join('') || `<p>${LANG==='ar'?'لا توجد رؤى الآن — استمر في الإدخال!':'No insights yet — keep logging!'}</p>`;
+  return advices.map(adviceHtml).join('') || `<p>${LANG==='ar'?'لا توجد رؤى — أضف المزيد من البيانات.':'Not enough data yet to advise.'}</p>`;
+}
+function adviceHtml(a){
+  const cls = a.type==='good'?'':a.type==='bad'?'bad':a.type==='warn'?'warn':'info';
+  return `<div class="advice-card ${cls}"><h3><span class="icon">${a.icon}</span> ${a.title}</h3><p>${a.body}</p></div>`;
+}
+function generateWeekAdvice(entries, sums, month, week){
+  if(entries.length === 0) return `<p class="small-text">${t('nodata')}</p>`;
+  const out = [];
+  const monthData = state.daily.filter(e => monthKey(e.date) === month);
+  const allWeeks = [1,2,3,4].map(w => {
+    const we = monthData.filter(e => weekOfMonth(e.date) === w);
+    const s = we.reduce((a,e)=>a+deriveEntry(e).total,0);
+    return {w, income:s, days:we.length, avg: we.length?s/we.length:0};
+  });
+  const thisWeek = allWeeks.find(x=>x.w===week);
+  const otherAvg = allWeeks.filter(x=>x.w!==week && x.days>0).map(x=>x.avg);
+  const baseline = otherAvg.length ? otherAvg.reduce((a,b)=>a+b,0)/otherAvg.length : 0;
+  if(thisWeek.days && baseline){
+    const diff = (thisWeek.avg - baseline) / baseline * 100;
+    if(diff > 10) out.push({type:'good', icon:'🌟', title: LANG==='ar'?'أسبوع قوي':'Strong week',
+      body: LANG==='ar'?`متوسط هذا الأسبوع أعلى ${diff.toFixed(0)}% من باقي أسابيع الشهر. كرر ما عملته.`
+            :`This week's daily average is ${diff.toFixed(0)}% higher than other weeks of the month. Repeat what worked.`});
+    if(diff < -15) out.push({type:'bad', icon:'⚠️', title: LANG==='ar'?'أسبوع ضعيف':'Weak week',
+      body: LANG==='ar'?`متوسط هذا الأسبوع أقل بـ ${Math.abs(diff).toFixed(0)}% من باقي أسابيع الشهر. راجع التقويم — هل كان فيه عطلات أو غياب؟`
+            :`This week's average is ${Math.abs(diff).toFixed(0)}% lower than other weeks. Check the calendar — holiday or barber absence?`});
+  }
+  const expDays = entries.filter(e => (e.shop_expense||0) > 200);
+  if(expDays.length > 0){
+    const topExp = expDays.sort((a,b)=>(b.shop_expense||0)-(a.shop_expense||0))[0];
+    out.push({type:'info', icon:'💸', title: LANG==='ar'?'مصروف كبير هذا الأسبوع':'Large expense this week',
+      body: (LANG==='ar'?`${fmt(topExp.shop_expense)} يوم ${topExp.date}: `:`${fmt(topExp.shop_expense)} on ${topExp.date}: `) + (topExp.expense_details||'—')
+    });
+  }
+  if(!out.length) out.push({type:'info', icon:'ℹ️', title:LANG==='ar'?'أسبوع نموذجي':'Typical week',
+    body: LANG==='ar'?`الأداء قريب من المتوسط. حاول تحسين متوسط الفاتورة (combo بدل قص فقط) لرفع رقم الأسبوع.`
+          :`Performance is near average. Try lifting average ticket (combos instead of cut-only) to push the weekly number up.`});
+  return out.map(adviceHtml).join('');
+}
+function renderAdvisor(){
+  const sorted = sortedDaily();
+  document.getElementById('fullAdvice').innerHTML = generateAdvice(sorted, 'full');
+  const tips_en = [
+    "Open a Google Business Profile if you haven't — free, drives 30%+ of walk-ins in Saudi neighborhoods.",
+    "Track each barber's revenue daily; pay-by-percentage works only when both sides see the same number.",
+    "Block one slow weekday morning for inventory + maintenance. Don't do it on Fridays/weekends.",
+    "Keep a 'lost client' note: every time a regular doesn't return in 6 weeks, send them a personal WhatsApp.",
+    "Don't accept walk-ins-only — encourage appointments to flatten your Tuesday/Wednesday dip.",
+    "Buy supplies bulk-monthly, not daily. The 'go grab one' habit eats 2-4 hours/week.",
+    "Charge a small no-show fee on online bookings — your time has a cost.",
+    "Photograph every haircut you're proud of (with permission). One viral Reel can refill a slow week.",
+    "Keep a 'top 5 expenses' card at the cashier — it makes overspend visible to whoever's at the till.",
+    "Pay yourself a fixed monthly amount (e.g. 3,000 SAR) before splitting profits. Treat the shop like a business, not a wallet."
+  ];
+  const tips_ar = [
+    "افتح ملف Google Business إن لم يكن لديك — مجاني، ويجلب أكثر من ٣٠٪ من زبائن الحي.",
+    "سجّل دخل كل حلاق يوميًا — نظام النسبة يعمل فقط عندما يرى الجميع نفس الرقم.",
+    "خصّص صباح يوم خفيف للمخزون والصيانة — لا تفعل ذلك يوم الجمعة/السبت.",
+    "احتفظ بقائمة 'العملاء المفقودين': لو غاب عميل ٦ أسابيع، أرسل رسالة واتساب شخصية.",
+    "شجع الحجز المسبق لتقليل ضعف يوم الثلاثاء/الأربعاء.",
+    "اشترِ المستلزمات بالجملة شهريًا، لا يوميًا. عادة 'أروح أجيب واحدة' تأكل ٢-٤ ساعات أسبوعيًا.",
+    "افرض رسوم بسيطة على عدم الحضور للحجوزات الإلكترونية — وقتك له ثمن.",
+    "صور كل قصة شعر مميزة (بإذن العميل). ريل واحد ناجح يكفي لتعويض أسبوع ضعيف.",
+    "علق قائمة 'أكبر ٥ مصاريف الشهر' عند الكاشير — يصبح الإسراف مرئيًا للجميع.",
+    "ادفع لنفسك راتبًا شهريًا ثابتًا (مثلاً ٣٠٠٠ ر.س) قبل توزيع الأرباح. عامل المحل كمشروع وليس محفظة."
+  ];
+  const tips = LANG==='ar' ? tips_ar : tips_en;
+  document.getElementById('productivityList').innerHTML = tips.map(x => `<li>${x}</li>`).join('');
+}
+
+// =================== MARKETING ===================
+function renderMarketing(){
+  const ideas_en = [
+    {icon:'📱', title:'WhatsApp "Tuesday-Wednesday" combo', cost:'Free', body:'Send a single message every Monday night to your existing client WhatsApp: "Cut + Beard 40 SAR (Tue/Wed only)". This fills your slowest days without discounting peak days. Keep the list opt-in.'},
+    {icon:'🎁', title:'Loyalty card: 5th cut free', cost:'~3 SAR per card', body:'Print 200 small stamped cards from a local press. Customers love completing them — proven to lift repeat visits by 20-30%. Add a barcode/serial number so you can spot fakes.'},
+    {icon:'📸', title:'Before/After Instagram reels', cost:'Free', body:'Film one 15-second before/after a week with the barber\'s phone. Post 2x weekly with location tag + service prices in caption. One viral reel can bring 50+ new walk-ins. Always ask permission from the customer first.'},
+    {icon:'🤝', title:'Local partnership: gym/clothing store', cost:'Free', body:'Drop 50 voucher cards at the nearest gym, men\'s clothing shop, or coffee shop: "10 SAR off first visit". You give 10 SAR, you get a paying customer + a referral chain. Track which partner brings the most.'},
+    {icon:'⭐', title:'Google Reviews push', cost:'Free', body:'After every haircut on a Thursday/Friday (happy customers), the barber says: "If you have 30 seconds, a Google review really helps the shop". Aim for 1 review/day. 50+ reviews drops your CAC and lifts ranking in Maps significantly.'},
+    {icon:'👰', title:'Wedding season packages', cost:'Low', body:'Saudi wedding season (typically summer + winter): offer "Groom Package" — cut + beard sculpt + face treatment for ~120 SAR. Market on Snap with one or two real grooms (with permission). Premium pricing on premium occasions.'},
+    {icon:'🎓', title:'Student discount card', cost:'Free', body:'Partner with the nearest school/college: 15% off with student ID on Sunday/Monday. Students bring friends and graduate to full-paying adults. Sustainable, low-effort.'},
+    {icon:'🏷', title:'"Refer 3 friends, get yours free"', cost:'Cost of 1 free cut', body:'Give each happy customer 3 unique codes. When all 3 are redeemed, they get a free cut. Forces them to actively recruit. Use a notebook at the cashier to track codes — keep it simple.'},
+    {icon:'🌙', title:'Eid/Ramadan night hours', cost:'Time', body:'Open until 1-2 AM during Ramadan and the night before Eid — this is THE highest revenue window in Saudi. Hire one extra hand for that week only. Your March data already shows the spike — plan ahead next year.'},
+    {icon:'🎂', title:'Birthday free trim', cost:'Free trim', body:'Collect birthdays at checkout. Send a "Free side trim or beard cleanup on your birthday week" SMS/WhatsApp. They almost always book a full service. Very cheap acquisition method.'},
+    {icon:'📋', title:'Service menu rebranding', cost:'Low', body:'Add 2-3 premium-named services: "Royal Beard Sculpt — 60 SAR", "Express CEO Cut — 50 SAR (in & out, 15 min)". Same work, premium positioning. Watch which sells.'},
+    {icon:'🧴', title:'Sell take-home product (small)', cost:'Inventory', body:'Stock 2-3 items only: beard oil, pomade, aftershave. Mark up 50-80%. Even 1 sale/day adds ~600 SAR/month profit. Start with 10 units each.'}
+  ];
+  const ideas_ar = [
+    {icon:'📱', title:'عرض الثلاثاء-الأربعاء على واتساب', cost:'مجاني', body:'أرسل رسالة واحدة كل ليلة إثنين لقاعدة عملائك: "قص + لحية ٤٠ ريال (ثلاثاء/أربعاء فقط)". هذا يملأ أضعف أيامك دون خفض أسعار أيام الذروة. اجعل القائمة اختيارية فقط.'},
+    {icon:'🎁', title:'كرت ولاء: القصة الخامسة مجانية', cost:'~٣ ر.س للكرت', body:'اطبع ٢٠٠ كرت صغير من أي مطبعة محلية. العميل يحب إكمالها — ترفع تكرار الزيارات ٢٠-٣٠٪. أضف باركود أو رقم تسلسلي لتمنع التزوير.'},
+    {icon:'📸', title:'ريلات قبل/بعد على إنستغرام', cost:'مجاني', body:'صور فيديو ١٥ ثانية قبل/بعد مرة واحدة كل أسبوع. انشر مرتين أسبوعيًا مع موقعك وأسعار الخدمات في الكابشن. ريل ناجح واحد قد يجلب ٥٠+ عميل جديد. اطلب إذن العميل أولًا.'},
+    {icon:'🤝', title:'شراكة محلية: جيم/محل ملابس', cost:'مجاني', body:'وزع ٥٠ كرت قسيمة في أقرب نادي رياضي أو محل ملابس رجالي أو كافيه: "خصم ١٠ ر.س على أول زيارة". أنت تخسر ١٠ ر.س وتربح عميل دائم. تابع أي شريك يجلب أكثر.'},
+    {icon:'⭐', title:'حملة تقييمات جوجل', cost:'مجاني', body:'بعد كل قصة يوم الخميس/الجمعة (عملاء سعداء)، يقول الحلاق: "لو عندك ٣٠ ثانية، تقييم جوجل يساعد المحل كثير". الهدف تقييم/يوم. ٥٠+ تقييم يخفض تكلفة جلب العميل ويرفعك في خرائط جوجل.'},
+    {icon:'👰', title:'باقات موسم الأعراس', cost:'منخفض', body:'موسم الأعراس السعودي (صيف وشتاء): قدم "باقة العريس" — قص + لحية + علاج وجه بـ ١٢٠ ر.س. سوقها على سناب مع عريسين حقيقيين (بإذنهم). سعر مميز للمناسبة المميزة.'},
+    {icon:'🎓', title:'كرت خصم طلابي', cost:'مجاني', body:'تواصل مع أقرب مدرسة/كلية: ١٥٪ خصم بالبطاقة الطلابية أيام الأحد/الإثنين. الطلاب يجيبون أصدقاءهم ويتخرجون لعملاء كبار. استثمار طويل المدى.'},
+    {icon:'🏷', title:'"احجز ٣ أصدقاء، قصتك مجانية"', cost:'تكلفة قصة واحدة', body:'أعط كل عميل سعيد ٣ أكواد فريدة على كرت. لما تُستخدم الثلاثة، يحصل على قصة مجانية. ادفع به للترشيح الفعّال. سجّل الأكواد في دفتر بسيط عند الكاشير.'},
+    {icon:'🌙', title:'ساعات ليالي رمضان والعيد', cost:'وقت', body:'افتح حتى ١-٢ صباحًا في رمضان وليلة العيد — هذه أعلى نافذة دخل في السعودية. وظف مساعد إضافي لذلك الأسبوع فقط. بياناتك في مارس تظهر الذروة — خطط مبكرًا للسنة القادمة.'},
+    {icon:'🎂', title:'قصة عيد الميلاد مجانية', cost:'قصة مجانية', body:'اجمع تواريخ الميلاد عند الدفع. أرسل SMS/واتساب: "اختر تشذيب جانبي أو لحية مجانية في أسبوع ميلادك". غالبًا يحجزون خدمة كاملة. طريقة جذب رخيصة جدًا.'},
+    {icon:'📋', title:'إعادة تسمية قائمة الخدمات', cost:'منخفض', body:'أضف ٢-٣ خدمات بأسماء بريميوم: "تشذيب اللحية الملكي — ٦٠ ر.س"، "قصة المدير السريعة — ٥٠ ر.س (داخل/خارج، ١٥ دقيقة)". نفس العمل، تموضع أرقى.'},
+    {icon:'🧴', title:'بيع منتجات للمنزل (صغير)', cost:'مخزون', body:'احتفظ بـ ٢-٣ منتجات فقط: زيت لحية، شمع شعر، عطر بعد الحلاقة. هامش ربح ٥٠-٨٠٪. حتى بيع قطعة/يوم يضيف ~٦٠٠ ر.س ربح شهري. ابدأ بـ ١٠ قطع من كل صنف.'}
+  ];
+  const ideas = LANG==='ar' ? ideas_ar : ideas_en;
+  document.getElementById('marketingGrid').innerHTML = ideas.map(i => `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <h3 style="font-size:15px"><span class="icon">${i.icon}</span> ${i.title}</h3>
+        <span class="badge ${i.cost.toLowerCase().includes('free')||i.cost.includes('مجاني')?'green':'yellow'}">${i.cost}</span>
+      </div>
+      <p style="font-size:13px;color:var(--text);line-height:1.55">${i.body}</p>
+    </div>
+  `).join('');
+}
+
+// =================== SETTINGS ===================
+function renderSettings(){
+  const list = document.getElementById('barbersList');
+  list.innerHTML = state.barbers.map((b,i) => {
+    const dn = LANG==='ar' ? (b.name_ar||b.name) : b.name;
+    return `
+    <div class="barber-row">
+      <div class="head">
+        <span>${dn} ${b.owner?`<span class="badge blue">${LANG==='ar'?'مالك':'owner'}</span>`:''}</span>
+        ${state.barbers.length > 1 ? `<button class="remove" onclick="removeBarber(${i})">×</button>`:''}
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>${LANG==='ar'?'الاسم':'Name'}</label>
+          <input type="text" value="${dn}" onchange="updateBarber(${i},'name',this.value)">
+        </div>
+        <div class="form-group">
+          <label>${t('commission')}</label>
+          <input type="number" value="${b.commission}" min="0" max="100" onchange="updateBarber(${i},'commission',+this.value)" ${b.owner?'disabled':''}>
+        </div>
+        <div class="form-group">
+          <label>${t('owner_q')}</label>
+          <select onchange="updateBarber(${i},'owner',this.value==='true')">
+            <option value="false" ${!b.owner?'selected':''}>${t('no')}</option>
+            <option value="true" ${b.owner?'selected':''}>${t('yes')}</option>
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('cardFeePct').value = state.cardFeePct;
+  document.getElementById('vatRate').value = state.vatRate;
+  document.getElementById('saudiPartnerMonthly').value = state.monthlyConfig.saudiPartnerMonthly;
+  document.getElementById('rentAmount').value = state.monthlyConfig.rentAmount;
+  document.getElementById('rentMonths').value = state.monthlyConfig.rentMonths;
+  document.getElementById('rentMode').value = state.monthlyConfig.rentMode;
+  // Partners list
+  const pList = document.getElementById('partnersList');
+  pList.innerHTML = state.partners.map((p,i) => {
+    const dn = LANG==='ar' ? (p.name_ar||p.name) : p.name;
+    return `<div class="barber-row">
+      <div class="head">
+        <span>${dn}</span>
+        ${state.partners.length>1 ? `<button class="remove" onclick="removePartner(${i})">×</button>`:''}
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>${LANG==='ar'?'الاسم':'Name'}</label>
+          <input type="text" value="${dn}" onchange="updatePartner(${i},'name',this.value)">
+        </div>
+        <div class="form-group">
+          <label>${t('partner_share')}</label>
+          <input type="number" value="${p.share}" min="0" max="100" step="1" onchange="updatePartner(${i},'share',+this.value)">
+        </div>
+      </div>
+    </div>`;
+  }).join('') + `<div style="margin-top:10px"><button class="btn primary" onclick="addPartner()">+ ${LANG==='ar'?'إضافة شريك':'Add partner'}</button></div>`;
+}
+function updatePartner(i, field, value){
+  if(field === 'name'){ state.partners[i].name = value; state.partners[i].name_ar = value; }
+  else state.partners[i][field] = value;
+  saveState();
+}
+function removePartner(i){
+  if(!confirm(LANG==='ar'?'حذف هذا الشريك؟':'Remove this partner?')) return;
+  state.partners.splice(i,1);
+  saveState();
+  renderSettings();
+}
+function addPartner(){
+  const name = prompt(LANG==='ar'?'اسم الشريك:':'Partner name:');
+  if(!name) return;
+  const share = +prompt(LANG==='ar'?'النسبة %:':'Share %:', '50') || 50;
+  const id = name.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
+  state.partners.push({id, name, name_ar:name, share});
+  saveState();
+  renderSettings();
+}
+function updateBarber(i, field, value){
+  if(field === 'name'){ state.barbers[i].name = value; state.barbers[i].name_ar = value; }
+  else { state.barbers[i][field] = value; }
+  saveState();
+}
+function removeBarber(i){
+  if(confirm(LANG==='ar'?'حذف هذا الحلاق؟':'Remove this barber?')){
+    state.barbers.splice(i,1);
+    saveState();
+    renderSettings();
+  }
+}
+document.getElementById('addBarberBtn').addEventListener('click', () => {
+  const name = document.getElementById('newBarberName').value.trim();
+  if(!name) return;
+  const commission = +document.getElementById('newBarberCommission').value || 50;
+  const owner = document.getElementById('newBarberOwner').value === 'true';
+  const id = name.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
+  state.barbers.push({id, name, name_ar:name, commission, owner});
+  saveState();
+  document.getElementById('newBarberName').value = '';
+  renderSettings();
+});
+document.getElementById('cardFeePct').addEventListener('change', e => { state.cardFeePct = +e.target.value || 0; saveState(); });
+document.getElementById('vatRate').addEventListener('change', e => { state.vatRate = +e.target.value || 0; saveState(); });
+document.getElementById('saudiPartnerMonthly').addEventListener('change', e => { state.monthlyConfig.saudiPartnerMonthly = +e.target.value || 0; saveState(); });
+document.getElementById('rentAmount').addEventListener('change', e => { state.monthlyConfig.rentAmount = +e.target.value || 0; saveState(); });
+document.getElementById('rentMonths').addEventListener('change', e => { state.monthlyConfig.rentMonths = +e.target.value || 1; saveState(); });
+document.getElementById('rentMode').addEventListener('change', e => { state.monthlyConfig.rentMode = e.target.value; saveState(); });
+
+// ===== Monthly expense add =====
+document.getElementById('addExpenseBtn').addEventListener('click', () => {
+  const month = document.getElementById('expensesMonth').value;
+  const cat = document.getElementById('expenseCategory').value;
+  const amt = +document.getElementById('expenseAmount').value || 0;
+  const desc = document.getElementById('expenseDescription').value;
+  const date = document.getElementById('expenseDate').value || (month + '-01');
+  if(amt <= 0){ alert(LANG==='ar'?'أدخل مبلغًا':'Enter an amount'); return; }
+  if(!state.monthlyExtras[month]) state.monthlyExtras[month] = [];
+  state.monthlyExtras[month].push({
+    id: 'x_' + Date.now() + Math.random().toString(36).slice(2,6),
+    date, category: cat, amount: amt, description: desc
+  });
+  saveState();
+  document.getElementById('expenseAmount').value = 0;
+  document.getElementById('expenseDescription').value = '';
+  renderExpensesContent();
+  toast(t('saved'));
+});
+
+// ===== Withdrawal add =====
+document.getElementById('addWdBtn').addEventListener('click', () => {
+  const person = document.getElementById('wdPerson').value;
+  const amount = +document.getElementById('wdAmount').value || 0;
+  const date = document.getElementById('wdDate').value;
+  const note = document.getElementById('wdNote').value;
+  if(amount <= 0){ alert(LANG==='ar'?'أدخل مبلغًا':'Enter an amount'); return; }
+  if(!date){ alert(LANG==='ar'?'اختر تاريخ':'Pick a date'); return; }
+  state.withdrawals.push({
+    id: 'w_' + Date.now() + Math.random().toString(36).slice(2,6),
+    date, person, amount, note
+  });
+  saveState();
+  document.getElementById('wdAmount').value = 0;
+  document.getElementById('wdNote').value = '';
+  renderWithdrawalsContent();
+  toast(t('saved'));
+});
+
+// ===== Bill add =====
+document.getElementById('addBillBtn').addEventListener('click', () => {
+  const gross = +document.getElementById('billGross').value || 0;
+  const date = document.getElementById('billDate').value;
+  const supplier = document.getElementById('billSupplier').value;
+  const category = document.getElementById('billCategory').value;
+  const invoice = document.getElementById('billInvoice').value;
+  if(gross <= 0){ alert(LANG==='ar'?'أدخل مبلغًا':'Enter an amount'); return; }
+  if(!date){ alert(LANG==='ar'?'اختر تاريخ':'Pick a date'); return; }
+  const rate = (state.vatRate || 15) / 100;
+  const net = gross / (1 + rate);
+  const vat = gross - net;
+  state.bills.push({
+    id: 'b_' + Date.now() + Math.random().toString(36).slice(2,6),
+    date, supplier, category, gross, net, vat, invoice
+  });
+  saveState();
+  document.getElementById('billGross').value = 0;
+  document.getElementById('billSupplier').value = '';
+  document.getElementById('billInvoice').value = '';
+  renderVATContent();
+  toast(t('saved'));
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if(!confirm(t('confirm_reset'))) return;
+  localStorage.removeItem(STORE_KEY);
+  state = defaultState();
+  saveState();
+  renderCurrentTab();
+});
+
+// =================== EXPORT / IMPORT ===================
+function doExport(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'reda_barber_backup_' + todayStr() + '.json';
+  a.click();
+}
+function doImport(){ document.getElementById('importFile').click(); }
+document.getElementById('exportBtn').addEventListener('click', doExport);
+document.getElementById('exportBtn2').addEventListener('click', doExport);
+document.getElementById('importBtn').addEventListener('click', doImport);
+document.getElementById('importBtn2').addEventListener('click', doImport);
+document.getElementById('importFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try{
+      const data = JSON.parse(ev.target.result);
+      state = data;
+      // Re-apply backwards-compat
+      const d = defaultState();
+      for(const k of Object.keys(d)) if(state[k] === undefined) state[k] = d[k];
+      saveState();
+      renderCurrentTab();
+      toast(t('saved'));
+    } catch(err){ alert('Invalid file: '+err.message);}
+  };
+  r.readAsText(f);
+});
+
+// =================== UTILS ===================
+function toast(msg){
+  const tEl = document.createElement('div');
+  tEl.className = 'toast'; tEl.textContent = msg;
+  document.body.appendChild(tEl);
+  setTimeout(()=>tEl.remove(), 2200);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// FIREBASE CONFIG
+// Bilal: replace these values with your own Firebase project
+// ═══════════════════════════════════════════════════════════
+const FB_CONFIG = {
+  apiKey: "AIzaSyCJp3TCvQylhCfPzP6c-hfzat2kfFKtqoE",
+  authDomain: "reda-barber-6b6c5.firebaseapp.com",
+  databaseURL: "https://reda-barber-6b6c5-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "reda-barber-6b6c5",
+  storageBucket: "reda-barber-6b6c5.firebasestorage.app",
+  messagingSenderId: "94233974625",
+  appId: "1:94233974625:web:06b9afa7da66353c20d720"
+};
+const FB_PATH = "redabarber/state";  // path in the database
+
+let fbApp = null;
+let fbDb  = null;
+let fbRef = null;
+let fbListening = false;
+let isSyncWrite = false;  // flag to avoid re-writing what we just received
+
+function initFirebase(){
+  if(!FB_CONFIG.apiKey || FB_CONFIG.apiKey === ''){
+    setLive(false,'setup needed');
+    return;
+  }
+  try{
+    fbApp = firebase.initializeApp(FB_CONFIG);
+    fbDb  = firebase.database(fbApp);
+    fbRef = fbDb.ref(FB_PATH);
+    startLiveListener();
+  }catch(e){
+    setLive(false,'Firebase error');
+    console.error('Firebase init error:', e);
+  }
+}
+
+function startLiveListener(){
+  if(fbListening) return;
+  fbListening = true;
+  setLive(null, 'connecting...');
+  fbRef.on('value', snapshot => {
+    setLive(true, 'live');
+    const remote = snapshot.val();
+    if(!remote) return;                    // nothing in DB yet
+    if(isSyncWrite){ isSyncWrite=false; return; }  // ignore our own write
+    try{
+      const remoteState = typeof remote === 'string' ? JSON.parse(remote) : remote;
+      // Merge without overwriting current user's unsaved edits
+      // Simple strategy: remote wins for daily array (merge by date)
+      const localMap = {};
+      (state.daily||[]).forEach(e => localMap[e.date] = e);
+      (remoteState.daily||[]).forEach(e => {
+        if(!localMap[e.date]) localMap[e.date] = e;
+        else {
+          // prefer the one with more non-zero barber data
+          const lScore = Object.values(localMap[e.date].barbers||{}).reduce((s,b)=>s+(b.cash||0)+(b.card||0),0);
+          const rScore = Object.values(e.barbers||{}).reduce((s,b)=>s+(b.cash||0)+(b.card||0),0);
+          if(rScore > lScore) localMap[e.date] = e;
+        }
+      });
+      state.daily = Object.values(localMap).sort((a,b)=>a.date.localeCompare(b.date));
+      // Merge arrays with IDs
+      function mergeById(a,b){
+        const m={};
+        (a||[]).forEach(x=>m[x.id]=x);
+        (b||[]).forEach(x=>{ if(!m[x.id]) m[x.id]=x; });
+        return Object.values(m);
+      }
+      state.withdrawals = mergeById(state.withdrawals, remoteState.withdrawals);
+      state.bills        = mergeById(state.bills,        remoteState.bills);
+      state.setup        = mergeById(state.setup,        remoteState.setup);
+      // Config: take remote if local is default
+      const d = defaultState();
+      for(const k of ['barbers','partners','monthlyConfig','cardFeePct','vatRate']){
+        if(JSON.stringify(state[k])===JSON.stringify(d[k]) && remoteState[k]!==undefined){
+          state[k] = remoteState[k];
+        }
+      }
+      // Save locally & re-render (without triggering another FB write)
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      renderCurrentTab();
+    }catch(e){ console.error('Live merge error', e); }
+  }, err => {
+    setLive(false, 'offline');
+    console.error('Firebase listener error:', err);
+  });
+}
+
+function fbWrite(){
+  if(!fbRef){ return; }   // not connected, localStorage already saved
+  isSyncWrite = true;
+  setLive(null, 'saving...');
+  fbRef.set(JSON.stringify(state))
+    .then(()=>{ setLive(true,'live'); })
+    .catch(e=>{ setLive(false,'save error'); isSyncWrite=false; console.error(e); });
+}
+
+function setLive(ok, label){
+  const dot   = document.getElementById('liveDot');
+  const lbl   = document.getElementById('liveLabel');
+  if(!dot||!lbl) return;
+  dot.className = ok===true?'live':ok===false?'':'saving';
+  lbl.textContent = label||'';
+}
+
+// ── Patch saveState to also write to Firebase ─────────────────────────────
+const _origSaveState = saveState;  // original localStorage saveState
+window.saveState = function(){
+  _origSaveState();   // always save to localStorage first
+  fbWrite();          // then push to Firebase (debounced below)
+};
+
+// ── Debounce: if user types fast, wait 800ms before writing to Firebase ───
+let fbWriteTimer = null;
+const _saveStateDebounced = window.saveState;
+window.saveState = function(){
+  _origSaveState();   // localStorage: instant
+  clearTimeout(fbWriteTimer);
+  fbWriteTimer = setTimeout(fbWrite, 800);
+};
+
+// ═══════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════
+const USERS = {
+  bilal:{ password:'bilal2026', label:'Bilal بلال' },
+  reda: { password:'reda2026',  label:'Reda رضا'   }
+};
+let currentUser   = null;
+let selectedUser  = null;
+
+function selectUser(id){
+  selectedUser = id;
+  document.querySelectorAll('.user-card').forEach(c=>c.classList.remove('selected'));
+  const card = document.getElementById('card'+id[0].toUpperCase()+id.slice(1));
+  if(card) card.classList.add('selected');
+  document.getElementById('loginErr').textContent = '';
+  document.getElementById('loginPw').focus();
+}
+
+function doLogin(){
+  if(!selectedUser){ document.getElementById('loginErr').textContent='اختر مستخدماً / Select a user'; return; }
+  const pw = document.getElementById('loginPw').value;
+  if(pw === USERS[selectedUser].password){
+    currentUser = selectedUser;
+    localStorage.setItem('rb_session', JSON.stringify({user:currentUser, ts:Date.now()}));
+    document.getElementById('loginOverlay').classList.add('hidden');
+    document.getElementById('userBadgeLabel').textContent = USERS[currentUser].label;
+    document.getElementById('loginPw').value = '';
+    document.getElementById('loginErr').textContent = '';
+    initFirebase();       // connect Firebase after login
+    renderCurrentTab();
+    setTimeout(refreshInsight, 1000);
+  }else{
+    document.getElementById('loginErr').textContent = '❌ كلمة مرور خاطئة / Wrong password';
+    document.getElementById('loginPw').value = '';
+  }
+}
+
+function doLogout(){
+  if(!confirm('تسجيل خروج؟ / Logout?')) return;
+  currentUser = null; selectedUser = null;
+  localStorage.removeItem('rb_session');
+  if(fbRef) fbRef.off();
+  fbListening = false;
+  setLive(false,'');
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('loginPw').value = '';
+  document.getElementById('loginErr').textContent = '';
+  document.querySelectorAll('.user-card').forEach(c=>c.classList.remove('selected'));
+}
+
+// Auto-restore session (12h)
+(function(){
+  try{
+    const s = JSON.parse(localStorage.getItem('rb_session')||'null');
+    if(s && s.user && (Date.now()-s.ts) < 43200000){
+      currentUser = s.user; selectedUser = s.user;
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('userBadgeLabel').textContent = USERS[s.user].label;
+      setTimeout(initFirebase, 100);     // connect after DOM ready
+      setTimeout(refreshInsight, 1500);
+    }
+  }catch(e){}
+})();
+
+// ═══════════════════════════════════════════════════════════
+// BILINGUAL INSIGHT (AI-powered, fallback to local calc)
+// ═══════════════════════════════════════════════════════════
+async function refreshInsight(){
+  const enEl = document.getElementById('insightEN');
+  const arEl = document.getElementById('insightAR');
+  if(!enEl||!arEl) return;
+  enEl.innerHTML = '<strong>Analyzing...</strong>';
+  arEl.innerHTML = '<strong>جارٍ التحليل...</strong>';
+
+  const entries = (state.daily||[]).slice(-7);
+  const totalIncome   = entries.reduce((s,e)=>s+(+e.total_income  ||+e._orig_total_income  ||0),0);
+  const totalExpense  = entries.reduce((s,e)=>s+(+e.total_expense ||+e._orig_total_expense ||0),0);
+  const profit = totalIncome - totalExpense;
+  const days   = entries.length;
+  const avgDay = days ? Math.round(totalIncome/days) : 0;
+
+  // Fallback (always shown first, then AI overwrites)
+  enEl.innerHTML = `<strong>📈 Last ${days} days</strong>Income: <b>${Math.round(totalIncome).toLocaleString()} SAR</b> &nbsp;|&nbsp; Expenses: <b>${Math.round(totalExpense).toLocaleString()} SAR</b> &nbsp;|&nbsp; Profit: <b>${Math.round(profit).toLocaleString()} SAR</b><br>Daily avg: <b>${avgDay} SAR</b>`;
+  arEl.innerHTML = `<strong>📊 آخر ${days} أيام</strong>الدخل: <b>${Math.round(totalIncome).toLocaleString()} ر.س</b> &nbsp;|&nbsp; المصاريف: <b>${Math.round(totalExpense).toLocaleString()} ر.س</b> &nbsp;|&nbsp; الربح: <b>${Math.round(profit).toLocaleString()} ر.س</b><br>متوسط يومي: <b>${avgDay} ر.س</b>`;
+
+  // Try AI insight
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6', max_tokens:350,
+        messages:[{role:'user',content:`You are a business analyst for "الصالون الملكي الاحترافي" barber shop in Saudi Arabia.
+Last ${days} days: Income ${Math.round(totalIncome)} SAR, Expenses ${Math.round(totalExpense)} SAR, Profit ${Math.round(profit)} SAR, Avg daily ${avgDay} SAR.
+Write a brief insight. Format EXACTLY (no markdown, no asterisks):
+EN: {2 clear sentences in English with actionable observation}
+AR: {جملتان واضحتان بالعربية الفصحى مع ملاحظة عملية}`}]
+      })
+    });
+    const data = await resp.json();
+    const text = (data.content||[]).map(b=>b.text||'').join('');
+    const en = (text.match(/EN:\s*([\s\S]*?)(?=\nAR:|$)/)||[])[1]||'';
+    const ar = (text.match(/AR:\s*([\s\S]*?)$/)||[])[1]||'';
+    if(en) enEl.innerHTML = '<strong>📈 AI Insight</strong>' + en.trim();
+    if(ar) arEl.innerHTML = '<strong>📊 تحليل ذكي</strong>' + ar.trim();
+  }catch(e){ /* fallback already shown */ }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ARABIC LANGUAGE FIX
+// ═══════════════════════════════════════════════════════════
+function applyLangFix(lang){
+  const html = document.getElementById('htmlRoot');
+  if(!html) return;
+  if(lang==='ar'){
+    html.setAttribute('lang','ar');
+    html.setAttribute('dir','rtl');
+  }else{
+    html.setAttribute('lang','en');
+    html.setAttribute('dir','ltr');
+  }
+}
+document.getElementById('langBtn').addEventListener('click', ()=>setTimeout(()=>applyLangFix(LANG),60));
+applyLangFix(LANG);
+
+// =================== INIT ===================
+applyI18n();
+renderDashboard();
+
+// Expose for inline handlers
+window.removeSetup = removeSetup;
+window.updateBarber = updateBarber;
+window.removeBarber = removeBarber;
+window.updateEntryPreview = updateEntryPreview;
+window.removeExtra = removeExtra;
+window.toggleLumpRent = toggleLumpRent;
+window.removeWd = removeWd;
+window.removeBill = removeBill;
+window.updatePartner = updatePartner;
+window.removePartner = removePartner;
+window.addPartner = addPartner;
+</script>
+</body>
+</html>
